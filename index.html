@@ -117,6 +117,11 @@ input[type=file]{display:none}
   <!-- 总览 -->
   <div class="page active" id="page-dashboard">
     <div class="stat-grid" id="statGrid"></div>
+    <div class="card" style="background:linear-gradient(135deg,#722ed1,#9254de);color:#fff;border:none">
+      <div class="card-title" style="color:#fff"><span>📋 长期病例可视化汇总</span></div>
+      <p style="font-size:13px;opacity:.95;margin:6px 0 12px;line-height:1.6">肌酐/尿素氮/血磷/血钙/红细胞压积/离子钙/血钾及肾脏超声的历年趋势，叠加 IRIS 慢性肾病分期色带与关键临床事件时间线，专为长期随访分析设计。</p>
+      <button class="btn btn-sm" style="background:#fff;color:#722ed1;font-weight:600" onclick="window.location.href='case-summary.html'">查看病例汇总 →</button>
+    </div>
     <div class="card">
       <div class="card-title"><span>📊 近6个月呕吐频率</span><button class="btn btn-sm btn-outline" onclick="switchPage('symptoms')">详情</button></div>
       <div class="chart-box" id="dashVomitChart"></div>
@@ -259,6 +264,7 @@ input[type=file]{display:none}
   <div class="tab-item" onclick="switchPage('medications')"><span class="tab-icon">💊</span><span class="tab-label">用药</span></div>
   <div class="tab-item" onclick="switchPage('weight')"><span class="tab-icon">⚖️</span><span class="tab-label">体重</span></div>
   <div class="tab-item" onclick="switchPage('data')"><span class="tab-icon">💾</span><span class="tab-label">数据</span></div>
+  <div class="tab-item" onclick="window.location.href='case-summary.html'"><span class="tab-icon">📋</span><span class="tab-label">病例汇总</span></div>
 </div>
 
 <!-- 猫咪档案弹窗 -->
@@ -446,7 +452,7 @@ function calcAge(b){if(!b)return'';const d=new Date(b),n=new Date();const y=n.ge
 function switchPage(n){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const tabs=['dashboard','symptoms','medications','weight','calendar','data'];
+  const tabs=['dashboard','symptoms','medications','weight','data','case'];
   document.querySelectorAll('.tab-item').forEach((t,i)=>t.classList.toggle('active',tabs[i]===n));
   window.scrollTo(0,0);
   if(n==='dashboard')renderDashboard();
