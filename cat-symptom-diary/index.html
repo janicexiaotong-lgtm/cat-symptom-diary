@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="猫咪症状日记">
+<title>🐱 猫咪症状日记</title>
+<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--primary:#9254de;--primary-light:#f9f0ff;--danger:#ff4d4f;--warning:#faad14;--success:#52c41a;--blue:#1890ff;--purple:#722ed1;--bg:#faf5ff;--card:#fff;--text:#333;--text-2:#666;--text-3:#999;--border:#f0f0f0;--shadow:0 2px 8px rgba(146,84,222,0.08);--radius:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;padding-bottom:64px}
+.header{background:linear-gradient(135deg,#9254de 0%,#722ed1 100%);color:#fff;padding:16px 20px;border-radius:0 0 20px 20px;margin-bottom:12px;box-shadow:0 4px 12px rgba(146,84,222,0.15)}
+.header-top{display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:18px;font-weight:600}.header p{font-size:12px;opacity:.85;margin-top:2px}
+.cat-bar{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.cat-bar .cat-name{font-size:16px;font-weight:600}
+.cat-bar .cat-info{font-size:12px;opacity:.9}
+.container{max-width:600px;margin:0 auto;padding:0 12px}
+.page{display:none}.page.active{display:block}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card-title{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.stat-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);text-align:center}
+.stat-card .num{font-size:26px;font-weight:700;color:var(--primary)}
+.stat-card .num.danger{color:var(--danger)}.stat-card .num.warning{color:var(--warning)}.stat-card .num.success{color:var(--success)}.stat-card .num.blue{color:var(--blue)}
+.stat-card .label{font-size:12px;color:var(--text-3);margin-top:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:8px 16px;border:none;border-radius:8px;font-size:14px;cursor:pointer;background:var(--primary);color:#fff;font-family:inherit;transition:opacity .2s}
+.btn:hover{opacity:.85}.btn-block{width:100%;padding:11px;font-size:15px}
+.btn-outline{background:#fff;color:var(--primary);border:1px solid var(--primary)}
+.btn-danger{background:var(--danger)}.btn-gray{background:#f5f5f5;color:var(--text-2);border:1px solid var(--border)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.tabbar{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid var(--border);z-index:100;max-width:600px;margin:0 auto}
+.tab-item{flex:1;text-align:center;padding:8px 0 6px;cursor:pointer;color:var(--text-3);user-select:none}
+.tab-item.active{color:var(--primary)}
+.tab-item .tab-icon{font-size:20px;display:block;line-height:1}.tab-item .tab-label{font-size:10px;margin-top:2px}
+.list-item{padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.list-item:last-child{border-bottom:none}
+.list-item .main{flex:1;min-width:0}.list-item .title-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.list-item .title{font-weight:600;font-size:14px}.list-item .date{font-size:12px;color:var(--text-3)}
+.list-item .desc{font-size:13px;color:var(--text-2);margin-top:4px;word-break:break-all}
+.list-item .actions{display:flex;gap:6px;flex-shrink:0}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;line-height:1.5}
+.tag-red{background:#fff1f0;color:var(--danger)}.tag-orange{background:#fff7e6;color:#fa8c16}.tag-green{background:#f6ffed;color:var(--success)}.tag-blue{background:#e6f7ff;color:var(--blue)}.tag-gray{background:#fafafa;color:var(--text-2)}.tag-purple{background:#f9f0ff;color:var(--purple)}
+.severity-dots{display:inline-flex;gap:2px}.severity-dots .dot{width:8px;height:8px;border-radius:50%;background:#e8e8e8}.severity-dots .dot.on{background:var(--danger)}
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;justify-content:center;align-items:flex-end;overflow-y:auto;padding:20px 0}
+.modal-mask.show{display:flex}
+.modal{background:#fff;width:100%;max-width:600px;border-radius:14px 14px 0 0;padding:20px 16px 24px;animation:slideUp .25s ease;max-height:92vh;overflow-y:auto}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.modal-header h3{font-size:17px}.modal-close{font-size:22px;color:var(--text-3);cursor:pointer;line-height:1;background:none;border:none}
+.form-group{margin-bottom:14px}.form-group label{display:block;font-size:13px;color:var(--text-2);margin-bottom:6px;font-weight:500}
+.form-group label .req{color:var(--danger)}
+.form-control{width:100%;padding:9px 12px;border:1px solid #e8e8e8;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text)}
+.form-control:focus{outline:none;border-color:var(--primary)}
+textarea.form-control{resize:vertical;min-height:60px}
+.form-row{display:flex;gap:10px}.form-row .form-group{flex:1}
+.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.type-option{padding:10px 6px;text-align:center;border:1px solid #e8e8e8;border-radius:8px;cursor:pointer;font-size:13px;user-select:none}
+.type-option.selected{border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600}
+.type-option .emoji{display:block;font-size:20px;margin-bottom:2px}
+.severity-slider{display:flex;gap:6px}
+.severity-slider .level{flex:1;padding:8px 0;text-align:center;border:1px solid #e8e8e8;border-radius:6px;cursor:pointer;font-size:13px;user-select:none}
+.severity-slider .level.on{color:#fff;border-color:transparent;font-weight:600}
+.severity-slider .level.on[data-v="1"]{background:#52c41a}.severity-slider .level.on[data-v="2"]{background:#a0d911}.severity-slider .level.on[data-v="3"]{background:#faad14}.severity-slider .level.on[data-v="4"]{background:#fa8c16}.severity-slider .level.on[data-v="5"]{background:#ff4d4f}
+.img-upload-area{border:1px dashed #e8e8e8;border-radius:8px;padding:16px;text-align:center;color:var(--text-3);cursor:pointer}
+.img-preview-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.img-preview{position:relative;width:80px;height:80px;border-radius:6px;overflow:hidden}
+.img-preview img{width:100%;height:100%;object-fit:cover}
+.img-preview .remove{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(0,0,0,.5);color:#fff;border-radius:50%;border:none;font-size:12px;cursor:pointer;line-height:18px;padding:0}
+.empty{text-align:center;padding:40px 20px;color:var(--text-3)}.empty .emoji{font-size:48px;margin-bottom:10px}
+.chart-box{width:100%;overflow-x:auto}.chart-box svg{display:block}
+.metric-selector{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px}
+.metric-chip{padding:5px 12px;border:1px solid #e8e8e8;border-radius:16px;font-size:12px;white-space:nowrap;cursor:pointer;color:var(--text-2);background:#fff;user-select:none}
+.metric-chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 20px;border-radius:6px;z-index:300;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.section-title{font-size:13px;color:var(--text-3);margin:14px 0 8px;font-weight:500}
+input[type=file]{display:none}
+.muted{color:var(--text-3);font-size:12px}.text-danger{color:var(--danger)}.text-success{color:var(--success)}
+.quick-grid{display:flex;gap:10px;flex-wrap:wrap}
+.quick-btn{flex:1;min-width:22%;text-align:center;padding:14px 8px;background:var(--primary-light);border-radius:10px;cursor:pointer}
+.quick-btn .emoji{font-size:28px;display:block;margin-bottom:4px}.quick-btn text{font-size:12px;color:#666}
+/* 日历 */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-nav{font-size:24px;color:var(--primary);padding:4px 16px;cursor:pointer}
+.cal-title{font-size:16px;font-weight:600}
+.cal-stats{display:flex;justify-content:space-around;text-align:center;margin-bottom:12px;padding:10px;background:var(--primary-light);border-radius:8px}
+.cal-stat-num{font-size:20px;font-weight:700}.cal-stat-label{font-size:11px;color:#999;margin-top:2px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-week{text-align:center;font-size:11px;color:#999;padding:4px 0}
+.cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;background:#fafafa;font-size:12px;position:relative}
+.cal-cell.today{background:var(--primary-light);border:2px solid var(--primary)}
+.cal-cell.vomit{background:#ff4d4f;color:#fff}
+.cal-cell.cough{background:#faad14;color:#fff}
+.cal-cell.other{background:#9254de;color:#fff}
+.cal-cell .dot{width:4px;height:4px;border-radius:50%;margin-top:1px}
+.cal-legend{display:flex;gap:12px;justify-content:center;margin-top:10px;font-size:11px;color:#666}
+.cal-legend .sq{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:3px}
+@media(min-width:600px){.stat-grid{grid-template-columns:repeat(4,1fr)}.type-grid{grid-template-columns:repeat(5,1fr)}.modal{border-radius:14px;max-width:560px;margin:20px}.modal-mask{align-items:center;padding:0}@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}}
+.action-row{display:flex;gap:8px;margin-top:16px}.action-row .btn{flex:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div><h1>🐱 猫咪症状日记</h1><p>呕吐频率追踪 · 用药体重 · 趋势可视化</p></div>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.2)" onclick="openCatModal()">✎ 档案</button>
+  </div>
+  <div class="cat-bar" id="catBar"></div>
+</div>
+
+<div class="container">
+  <!-- 总览 -->
+  <div class="page active" id="page-dashboard">
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="card" style="background:linear-gradient(135deg,#722ed1,#9254de);color:#fff;border:none">
+      <div class="card-title" style="color:#fff"><span>📋 长期病例可视化汇总</span></div>
+      <p style="font-size:13px;opacity:.95;margin:6px 0 12px;line-height:1.6">肌酐/尿素氮/血磷/血钙/红细胞压积/离子钙/血钾及肾脏超声的历年趋势，叠加 IRIS 慢性肾病分期色带与关键临床事件时间线，专为长期随访分析设计。</p>
+      <button class="btn btn-sm" style="background:#fff;color:#722ed1;font-weight:600" onclick="window.location.href='case-summary.html'">查看病例汇总 →</button>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📊 近6个月呕吐频率</span><button class="btn btn-sm btn-outline" onclick="switchPage('symptoms')">详情</button></div>
+      <div class="chart-box" id="dashVomitChart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>⚖️ 体重变化</span><button class="btn btn-sm btn-outline" onclick="switchPage('weight')">详情</button></div>
+      <div class="chart-box" id="dashWeightChart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📝 最近症状</span></div>
+      <div id="recentSymptoms"></div>
+    </div>
+    <div class="card" id="medCard" style="display:none">
+      <div class="card-title"><span>💊 当前用药</span></div>
+      <div id="recentMeds"></div>
+    </div>
+  </div>
+
+  <!-- 症状 -->
+  <div class="page" id="page-symptoms">
+    <div class="card">
+      <div class="card-title"><span>📝 症状记录</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-gray" onclick="switchPage('calendar')">📅 日历</button>
+          <button class="btn btn-sm" onclick="openSymptomModal()">+ 记录</button>
+        </div>
+      </div>
+      <div class="section-title">月度频率统计</div>
+      <div class="metric-selector" id="symptomTypeSelector"></div>
+      <div class="chart-box" id="freqChart"></div>
+      <div class="section-title">历史记录</div>
+      <div id="symptomList"></div>
+    </div>
+  </div>
+
+  <!-- 用药 -->
+  <div class="page" id="page-medications">
+    <div class="card">
+      <div class="card-title"><span>📅 当前用药日历</span></div>
+      <p class="muted" style="margin-bottom:8px">显示正在使用的用药时长区间</p>
+      <div id="medCalendarActive"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📋 曾用药日历</span></div>
+      <p class="muted" style="margin-bottom:8px">显示已停药的用药时长区间</p>
+      <div id="medCalendarPast"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>💊 用药记录</span><button class="btn btn-sm" onclick="openMedModal()">+ 添加</button></div>
+      <div id="medList"></div>
+    </div>
+  </div>
+
+  <!-- 体重 -->
+  <div class="page" id="page-weight">
+    <div class="card">
+      <div class="card-title"><span>⚖️ 体重变化</span><button class="btn btn-sm" onclick="openWeightModal()">+ 记录</button></div>
+      <div id="weightSummary"></div>
+      <div class="section-title">体重趋势</div>
+      <div class="chart-box" id="weightChart"></div>
+      <div class="section-title">历史记录</div>
+      <div id="weightList"></div>
+    </div>
+  </div>
+
+  <!-- 日历 -->
+  <div class="page" id="page-calendar">
+    <div class="card">
+      <div class="card-title">
+        <span>📅 症状日历</span>
+        <button class="btn btn-sm btn-outline" onclick="switchPage('symptoms')">← 返回记录</button>
+      </div>
+      <div class="cal-header">
+        <span class="cal-nav" onclick="changeMonth(-1)">‹</span>
+        <span class="cal-title" id="calTitle"></span>
+        <span class="cal-nav" onclick="changeMonth(1)">›</span>
+      </div>
+      <div class="cal-stats" id="calStats"></div>
+      <div class="cal-grid" id="calWeekHeader"></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend">
+        <span><span class="sq" style="background:#ff4d4f"></span>呕吐</span>
+        <span><span class="sq" style="background:#faad14"></span>咳嗽</span>
+        <span><span class="sq" style="background:#9254de"></span>其他</span>
+      </div>
+    </div>
+    <div class="card" id="dayDetailCard" style="display:none">
+      <div class="card-title"><span id="dayDetailTitle"></span></div>
+      <div id="dayDetailContent"></div>
+    </div>
+  </div>
+
+  <!-- 数据 -->
+  <div class="page" id="page-data">
+    <div class="card">
+      <div class="card-title"><span>🔥 症状热力图（三个月内）</span></div>
+      <p class="muted" style="margin-bottom:10px">颜色越深表示当日症状越多，直观查看症状频率分布</p>
+      <div id="heatmap"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>💾 数据管理</span></div>
+      <p class="muted" style="margin-bottom:12px">数据保存在浏览器本地。开启云同步后可在手机和电脑间同步。</p>
+      <div class="section-title">☁️ 云同步（跨设备同步）</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label style="font-size:13px;color:#666;margin-bottom:4px;display:block">GitHub Token（上传用，<a href="https://github.com/settings/tokens/new?description=猫咪症状日记&scopes=gist" target="_blank" style="color:#9254de">点此创建</a>，勾选gist权限即可）</label>
+        <input class="form-control" id="syncToken" placeholder="ghp_xxxxx（创建后粘贴到此）" type="password" style="font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="form-control" id="syncCodeInput" placeholder="输入同步码下载" style="flex:2;font-size:13px">
+        <button class="btn btn-outline" onclick="syncDownload()" style="flex:1;font-size:13px;padding:8px">⬇️下载</button>
+      </div>
+      <button class="btn btn-block" onclick="syncUpload()" style="margin-bottom:8px">⬆️ 上传到云端（生成同步码）</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <input type="checkbox" id="autoSync" onchange="toggleAutoSync()">
+        <label for="autoSync" style="font-size:13px;color:#666;cursor:pointer">自动同步（每次修改后自动上传，首次上传后自动开启）</label>
+      </div>
+      <p class="muted" id="syncStatus" style="margin-bottom:8px;min-height:16px"></p>
+      <div class="section-title">数据备份</div>
+      <button class="btn btn-block" onclick="exportExcel()" style="margin-bottom:8px">📊 导出Excel（症状+用药+体重）</button>
+      <button class="btn btn-block btn-gray" onclick="loadSampleData()" style="margin-bottom:8px">📋 加载示例数据</button>
+      <button class="btn btn-block btn-outline" onclick="exportJSON()" style="margin-bottom:8px">📥 导出JSON备份</button>
+      <button class="btn btn-block btn-outline" onclick="document.getElementById('importJSON').click()" style="margin-bottom:8px">📤 导入JSON</button>
+      <a class="btn btn-block" href="excel-to-json.html" style="margin-bottom:8px;text-decoration:none;display:flex;align-items:center;justify-content:center">📋 从小程序Excel导入（转换工具）</a>
+      <input type="file" id="importJSON" accept=".json">
+      <button class="btn btn-block btn-danger" onclick="confirmClear()">🗑️ 清空所有数据</button>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>ℹ️ 说明</span></div>
+      <p class="muted">· 专为猫咪症状追踪设计，重点记录呕吐/咳嗽频率。</p>
+      <p class="muted">· 呕吐记录含时间、内容物、图片，就医时展示给医生。</p>
+      <p class="muted">· 可添加到手机桌面，像APP一样使用。</p>
+      <p class="muted">· iOS Safari：分享→添加到主屏幕。安卓Chrome：菜单→添加到主屏幕。</p>
+    </div>
+  </div>
+</div>
+
+<div class="tabbar">
+  <div class="tab-item active" onclick="switchPage('dashboard')"><span class="tab-icon">🏠</span><span class="tab-label">总览</span></div>
+  <div class="tab-item" onclick="switchPage('symptoms')"><span class="tab-icon">📝</span><span class="tab-label">症状</span></div>
+  <div class="tab-item" onclick="switchPage('medications')"><span class="tab-icon">💊</span><span class="tab-label">用药</span></div>
+  <div class="tab-item" onclick="switchPage('weight')"><span class="tab-icon">⚖️</span><span class="tab-label">体重</span></div>
+  <div class="tab-item" onclick="switchPage('data')"><span class="tab-icon">💾</span><span class="tab-label">数据</span></div>
+  <div class="tab-item" onclick="window.location.href='case-summary.html'"><span class="tab-icon">📋</span><span class="tab-label">病例汇总</span></div>
+</div>
+
+<!-- 猫咪档案弹窗 -->
+<div class="modal-mask" id="catModal">
+  <div class="modal">
+    <div class="modal-header"><h3>猫咪档案</h3><button class="modal-close" onclick="closeModal('catModal')">×</button></div>
+    <div class="form-row">
+      <div class="form-group"><label>名字 <span class="req">*</span></label><input class="form-control" id="catName" placeholder="如 橘子"></div>
+      <div class="form-group"><label>品种</label><input class="form-control" id="catBreed" placeholder="如 橘猫"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>出生日期</label><input type="date" class="form-control" id="catBirth"></div>
+      <div class="form-group"><label>性别</label><select class="form-control" id="catGender"><option value="公">公</option><option value="母">母</option></select></div>
+    </div>
+    <div class="form-group"><label>绝育</label><select class="form-control" id="catNeutered"><option value="已绝育">已绝育</option><option value="未绝育">未绝育</option></select></div>
+    <button class="btn btn-block" onclick="saveCat()">保存</button>
+  </div>
+</div>
+
+<!-- 症状弹窗 -->
+<div class="modal-mask" id="symptomModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="symptomModalTitle">添加症状</h3><button class="modal-close" onclick="closeModal('symptomModal')">×</button></div>
+    <input type="hidden" id="symptomId">
+    <div class="form-group"><label>症状类型 <span class="req">*</span></label><div class="type-grid" id="symptomTypeGrid"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label>日期 <span class="req">*</span></label><input type="date" class="form-control" id="symptomDate"></div>
+      <div class="form-group"><label>时间 <span class="req">*</span></label><input type="time" class="form-control" id="symptomTime"></div>
+    </div>
+    <div class="form-group"><label>严重程度 <span class="req">*</span></label><div class="severity-slider" id="severitySlider"></div><p class="muted" id="severityHint" style="margin-top:4px">请选择</p></div>
+    <div id="vomitSection">
+      <div class="form-group"><label>呕吐内容物 <span class="req">*</span></label><div class="type-grid" id="vomitContentGrid"></div></div>
+      <div class="form-row">
+        <div class="form-group"><label>呕吐量</label><select class="form-control" id="vomitAmount"><option value="">选择</option><option value="少量">少量(一点)</option><option value="中等">中等(一小摊)</option><option value="较多">较多(一大摊)</option><option value="大量">大量</option></select></div>
+        <div class="form-group"><label>呕吐次数</label><input type="number" class="form-control" id="vomitCount" placeholder="如 2"></div>
+      </div>
+      <div class="form-group"><label>呕吐物图片</label><div class="img-upload-area" onclick="document.getElementById('symptomImages').click()">📷 点击上传</div><input type="file" id="symptomImages" accept="image/*" multiple><div class="img-preview-list" id="imagePreviewList"></div></div>
+    </div>
+    <div id="coughSection" style="display:none">
+      <div class="form-group"><label>咳嗽类型</label><select class="form-control" id="coughType"><option value="">选择</option><option value="干咳">干咳(无痰)</option><option value="湿咳">湿咳(有痰)</option><option value="阵发性">阵发性</option><option value="偶尔">偶尔单次</option></select></div>
+      <div class="form-group"><label>持续时间</label><input class="form-control" id="coughDuration" placeholder="如 5分钟"></div>
+    </div>
+    <div class="form-group"><label>备注</label><textarea class="form-control" id="symptomNotes" placeholder="如 进食后/可能诱因"></textarea></div>
+    <button class="btn btn-block" onclick="saveSymptom()">保存</button>
+  </div>
+</div>
+
+<!-- 用药弹窗 -->
+<div class="modal-mask" id="medModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="medModalTitle">添加用药</h3><button class="modal-close" onclick="closeModal('medModal')">×</button></div>
+    <input type="hidden" id="medId">
+    <div class="form-group"><label>药物名称 <span class="req">*</span></label><input class="form-control" id="medName" placeholder="如 化毛膏"></div>
+    <div class="form-row">
+      <div class="form-group"><label>剂量</label><input class="form-control" id="medDosage" placeholder="如 5cm"></div>
+      <div class="form-group"><label>频次</label><input class="form-control" id="medFrequency" placeholder="如 每日1次"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>开始日期 <span class="req">*</span></label><input type="date" class="form-control" id="medStart"></div>
+      <div class="form-group"><label>结束日期</label><input type="date" class="form-control" id="medEnd"></div>
+    </div>
+    <div class="form-group"><label>备注</label><textarea class="form-control" id="medNotes" placeholder="如 饭后服用"></textarea></div>
+    <p class="muted" style="margin-bottom:8px">常用：化毛膏 / 猫草 / 益生菌 / 止吐药 / 补血肝精 / 眼药水 / 驱虫药</p>
+    <button class="btn btn-block" onclick="saveMed()">保存</button>
+  </div>
+</div>
+
+<!-- 体重弹窗 -->
+<div class="modal-mask" id="weightModal">
+  <div class="modal">
+    <div class="modal-header"><h3>记录体重</h3><button class="modal-close" onclick="closeModal('weightModal')">×</button></div>
+    <div class="form-row">
+      <div class="form-group"><label>日期 <span class="req">*</span></label><input type="date" class="form-control" id="weightDate"></div>
+      <div class="form-group"><label>体重(kg) <span class="req">*</span></label><input type="number" step="0.01" class="form-control" id="weightValue" placeholder="如 4.5"></div>
+    </div>
+    <div class="form-group"><label>备注</label><input class="form-control" id="weightNote" placeholder="如 体检/居家"></div>
+    <button class="btn btn-block" onclick="saveWeight()">保存</button>
+  </div>
+</div>
+
+<!-- 用药详情弹窗 -->
+<div class="modal-mask" id="medDetailModal">
+  <div class="modal">
+    <div class="modal-header"><h3>📋 用药详情</h3><button class="modal-close" onclick="closeModal('medDetailModal')">×</button></div>
+    <div id="medDetailContent"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='cat_symptom_v1';
+let state={cat:{name:'',breed:'',birthDate:'',gender:'公',neutered:'已绝育'},symptoms:[],medications:[],weights:[]};
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
+let editingImages=[];
+const SYMPTOM_TYPES=[{key:'呕吐',emoji:'🤮',color:'#ff4d4f'},{key:'咳嗽',emoji:'😷',color:'#faad14'},{key:'腹泻',emoji:'💩',color:'#fa8c16'},{key:'尿频',emoji:'🚽',color:'#eb2f96'},{key:'排尿异常',emoji:'💧',color:'#13c2c2'},{key:'其他',emoji:'📝',color:'#8c8c8c'}];
+const VOMIT_CONTENTS=[{key:'未消化食物',emoji:'🍖'},{key:'黄色胆汁',emoji:'🟡'},{key:'白色泡沫',emoji:'⚪'},{key:'毛球',emoji:'🧶'},{key:'带血红色',emoji:'🔴'},{key:'透明水样',emoji:'💧'},{key:'其他',emoji:'❓'}];
+const SEVERITY_HINTS={1:'轻微，几乎不影响',2:'较轻，稍有不适',3:'中等，有些影响',4:'较重，明显不适',5:'严重，需就医'};
+
+function loadData(){try{const r=localStorage.getItem(KEY);if(r)state=Object.assign(state,JSON.parse(r));}catch(e){}}
+function saveData(){localStorage.setItem(KEY,JSON.stringify(state));if(window._autoSync&&window._syncCode){clearTimeout(window._syncTimer);window._syncTimer=setTimeout(syncUploadSilent,2000);}}
+
+/* ===== 云同步（GitHub Gist） ===== */
+const GIST_API='https://api.github.com/gists';
+function initSync(){
+  const code=localStorage.getItem('cat_sync_code');
+  const auto=localStorage.getItem('cat_auto_sync')==='1';
+  const token=localStorage.getItem('cat_gh_token');
+  if(token)document.getElementById('syncToken').value=token;
+  if(code){window._syncCode=code;document.getElementById('syncCodeInput').value=code;document.getElementById('syncStatus').innerHTML='<span class="text-success">✓ 已绑定同步码：'+code+'</span>';}
+  if(auto){window._autoSync=true;document.getElementById('autoSync').checked=true;}
+}
+async function syncUpload(){
+  const status=document.getElementById('syncStatus');
+  const token=document.getElementById('syncToken').value.trim();
+  if(!token){toast('请先填入GitHub Token');return;}
+  localStorage.setItem('cat_gh_token',token);
+  status.textContent='⏳ 上传中...';
+  try{
+    const data=JSON.stringify(state);
+    let code=window._syncCode;
+    if(code){
+      const resp=await fetch(GIST_API+'/'+code,{method:'PATCH',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},body:JSON.stringify({files:{'cat_data.json':{content:data}}})});
+      if(!resp.ok)throw new Error('更新失败 '+resp.status);
+      status.innerHTML='<span class="text-success">✓ 已更新到云端（'+new Date().toLocaleTimeString()+'）</span>';
+    }else{
+      const resp=await fetch(GIST_API,{method:'POST',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},body:JSON.stringify({description:'Cat Symptom Tracker Data',public:false,files:{'cat_data.json':{content:data}}})});
+      if(!resp.ok)throw new Error('创建失败 '+resp.status);
+      const result=await resp.json();
+      code=result.id;window._syncCode=code;localStorage.setItem('cat_sync_code',code);
+      document.getElementById('syncCodeInput').value=code;
+      window._autoSync=true;document.getElementById('autoSync').checked=true;localStorage.setItem('cat_auto_sync','1');
+      status.innerHTML='<div style="background:#f9f0ff;border:1px solid #d3adf7;border-radius:8px;padding:12px;text-align:center;margin:8px 0"><div style="font-size:12px;color:#666;margin-bottom:4px">上传成功！同步码：</div><div style="font-size:20px;font-weight:700;color:#9254de;font-family:monospace;letter-spacing:1px">'+code+'</div><div style="font-size:11px;color:#999;margin-top:4px">已自动开启自动同步，在其他设备输入此同步码即可下载</div></div>';
+    }
+  }catch(e){status.innerHTML='<span class="text-danger">✗ 上传失败：'+e.message+'</span>';}
+}
+async function syncUploadSilent(){
+  if(!window._syncCode)return;
+  const token=localStorage.getItem('cat_gh_token');
+  if(!token)return;
+  try{
+    const data=JSON.stringify(state);
+    await fetch(GIST_API+'/'+window._syncCode,{method:'PATCH',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},body:JSON.stringify({files:{'cat_data.json':{content:data}}})});
+    const s=document.getElementById('syncStatus');if(s)s.innerHTML='<span class="text-success">✓ 自动同步成功（'+new Date().toLocaleTimeString()+'）</span>';
+  }catch(e){}
+}
+async function syncDownload(){
+  const code=document.getElementById('syncCodeInput').value.trim();
+  if(!code){toast('请输入同步码');return;}
+  const status=document.getElementById('syncStatus');
+  status.textContent='⏳ 下载中...';
+  try{
+    const resp=await fetch(GIST_API+'/'+code);
+    if(!resp.ok)throw new Error('同步码无效');
+    const result=await resp.json();
+    const content=result.files&&result.files['cat_data.json']&&result.files['cat_data.json'].content;
+    if(!content)throw new Error('数据不存在');
+    const data=JSON.parse(content);
+    if(!data.symptoms)throw new Error('数据格式错误');
+    if(confirm('云端数据：'+data.symptoms.length+'条症状、'+(data.medications||[]).length+'条用药、'+(data.weights||[]).length+'条体重\n\n确定覆盖本地数据？')){
+      state=Object.assign({cat:state.cat},data);
+      saveData();window._syncCode=code;localStorage.setItem('cat_sync_code',code);
+      status.innerHTML='<span class="text-success">✓ 下载成功！同步码已保存，后续可开启自动同步</span>';
+      renderDashboard();renderCatBar();
+      toast('下载成功');
+    }else{status.textContent='';}
+  }catch(e){status.innerHTML='<span class="text-danger">✗ 下载失败：'+e.message+'</span>';}
+}
+function toggleAutoSync(){
+  const on=document.getElementById('autoSync').checked;
+  window._autoSync=on;localStorage.setItem('cat_auto_sync',on?'1':'0');
+  if(on&&!window._syncCode){toast('请先上传生成同步码');document.getElementById('autoSync').checked=false;window._autoSync=false;localStorage.setItem('cat_auto_sync','0');return;}
+  toast(on?'已开启自动同步':'已关闭自动同步');
+}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function nowTime(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escA(s){return String(s||'').replace(/'/g,"\\'");}
+function val(id){return document.getElementById(id).value.trim();}
+function calcAge(b){if(!b)return'';const d=new Date(b),n=new Date();const y=n.getFullYear()-d.getFullYear();const m=n.getMonth()-d.getMonth();if(y<=0)return m>0?m+'个月':'幼猫';if(m<0)return(y-1)+'岁'+(12+m)+'个月';return y+'岁'+(m>0?m+'个月':'');}
+
+function switchPage(n){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+n).classList.add('active');
+  const tabs=['dashboard','symptoms','medications','weight','data','case'];
+  document.querySelectorAll('.tab-item').forEach((t,i)=>t.classList.toggle('active',tabs[i]===n));
+  window.scrollTo(0,0);
+  if(n==='dashboard')renderDashboard();
+  if(n==='symptoms')renderSymptomPage();
+  if(n==='medications'){renderMedPage();renderMedCalendar();}
+  if(n==='weight')renderWeightPage();
+  if(n==='calendar')renderCalendar();
+  if(n==='data')renderHeatmap();
+}
+
+/* ===== 猫咪档案 ===== */
+function renderCatBar(){
+  const c=state.cat;const b=document.getElementById('catBar');
+  if(!c.name){b.innerHTML='<span class="cat-info">点右上角"档案"设置猫咪信息</span>';return;}
+  b.innerHTML=`<span class="cat-name">🐱 ${esc(c.name)}</span><span class="cat-info">${calcAge(c.birthDate)||'年龄未知'} · ${c.gender} · ${c.neutered}</span>`;
+}
+function openCatModal(){
+  const c=state.cat;
+  document.getElementById('catName').value=c.name||'';
+  document.getElementById('catBreed').value=c.breed||'';
+  document.getElementById('catBirth').value=c.birthDate||'';
+  document.getElementById('catGender').value=c.gender||'公';
+  document.getElementById('catNeutered').value=c.neutered||'已绝育';
+  document.getElementById('catModal').classList.add('show');
+}
+function saveCat(){
+  state.cat={name:val('catName'),breed:val('catBreed'),birthDate:val('catBirth'),gender:val('catGender'),neutered:val('catNeutered')};
+  saveData();closeModal('catModal');toast('已保存');renderCatBar();renderDashboard();
+}
+
+/* ===== 症状 ===== */
+let curType=null,curSeverity=0,curVomitContent=null;
+function initSymptomTypes(){
+  document.getElementById('symptomTypeGrid').innerHTML=SYMPTOM_TYPES.map(t=>`<div class="type-option" data-type="${t.key}" onclick="selSymptomType('${t.key}')"><span class="emoji">${t.emoji}</span>${t.key}</div>`).join('');
+  document.getElementById('vomitContentGrid').innerHTML=VOMIT_CONTENTS.map(t=>`<div class="type-option" data-content="${t.key}" onclick="selVomitContent('${t.key}')"><span class="emoji">${t.emoji}</span>${t.key}</div>`).join('');
+  document.getElementById('severitySlider').innerHTML=[1,2,3,4,5].map(v=>`<div class="level" data-v="${v}" onclick="selSeverity(${v})">${v}</div>`).join('');
+}
+function selSymptomType(t){curType=t;document.querySelectorAll('#symptomTypeGrid .type-option').forEach(o=>o.classList.toggle('selected',o.dataset.type===t));document.getElementById('vomitSection').style.display=t==='呕吐'?'block':'none';document.getElementById('coughSection').style.display=t==='咳嗽'?'block':'none';}
+function selVomitContent(c){curVomitContent=c;document.querySelectorAll('#vomitContentGrid .type-option').forEach(o=>o.classList.toggle('selected',o.dataset.content===c));}
+function selSeverity(v){curSeverity=v;document.querySelectorAll('#severitySlider .level').forEach(l=>l.classList.toggle('on',+l.dataset.v===v));document.getElementById('severityHint').textContent=SEVERITY_HINTS[v];}
+
+function quickRecord(type){openSymptomModal();selSymptomType(type);}
+function openSymptomModal(id){
+  document.getElementById('symptomModal').classList.add('show');
+  document.getElementById('symptomModalTitle').textContent=id?'编辑症状':'添加症状';
+  document.getElementById('symptomId').value=id||'';
+  curType=null;curSeverity=0;curVomitContent=null;editingImages=[];
+  document.querySelectorAll('#symptomTypeGrid .type-option').forEach(o=>o.classList.remove('selected'));
+  document.querySelectorAll('#vomitContentGrid .type-option').forEach(o=>o.classList.remove('selected'));
+  document.querySelectorAll('#severitySlider .level').forEach(l=>l.classList.remove('on'));
+  document.getElementById('severityHint').textContent='请选择';
+  document.getElementById('symptomDate').value=today();
+  document.getElementById('symptomTime').value=nowTime();
+  document.getElementById('vomitAmount').value='';
+  document.getElementById('vomitCount').value='';
+  document.getElementById('coughType').value='';
+  document.getElementById('coughDuration').value='';
+  document.getElementById('symptomNotes').value='';
+  document.getElementById('vomitSection').style.display='none';
+  document.getElementById('coughSection').style.display='none';
+  renderImagePreview();
+  if(id){const s=state.symptoms.find(x=>x.id===id);if(s){
+    selSymptomType(s.type);selSeverity(s.severity);
+    document.getElementById('symptomDate').value=s.date;
+    document.getElementById('symptomTime').value=s.time;
+    if(s.vomitContent)selVomitContent(s.vomitContent);
+    document.getElementById('vomitAmount').value=s.vomitAmount||'';
+    document.getElementById('vomitCount').value=s.vomitCount||'';
+    document.getElementById('coughType').value=s.coughType||'';
+    document.getElementById('coughDuration').value=s.coughDuration||'';
+    document.getElementById('symptomNotes').value=s.notes||'';
+    editingImages=s.images?[...s.images]:[];renderImagePreview();
+  }}
+}
+function handleSymptomImages(input){
+  for(let f of input.files){const r=new FileReader();r.onload=e=>{editingImages.push(e.target.result);renderImagePreview();};r.readAsDataURL(f);}
+  input.value='';
+}
+function renderImagePreview(){document.getElementById('imagePreviewList').innerHTML=editingImages.map((s,i)=>`<div class="img-preview"><img src="${s}"><button class="remove" onclick="editingImages.splice(${i},1);renderImagePreview()">×</button></div>`).join('');}
+function saveSymptom(){
+  if(!curType){toast('请选择症状类型');return;}
+  if(!curSeverity){toast('请选择严重程度');return;}
+  if(curType==='呕吐'&&!curVomitContent){toast('请选择呕吐内容物');return;}
+  const id=val('symptomId');
+  const data={id:id||uid(),type:curType,date:val('symptomDate'),time:val('symptomTime'),severity:curSeverity,
+    vomitContent:curType==='呕吐'?(curVomitContent||''):'',vomitAmount:curType==='呕吐'?val('vomitAmount'):'',vomitCount:curType==='呕吐'?val('vomitCount'):'',
+    coughType:curType==='咳嗽'?val('coughType'):'',coughDuration:curType==='咳嗽'?val('coughDuration'):'',
+    notes:val('symptomNotes'),images:[...editingImages]};
+  if(id){const i=state.symptoms.findIndex(x=>x.id===id);state.symptoms[i]=data;}else{state.symptoms.push(data);}
+  saveData();closeModal('symptomModal');toast('保存成功');renderSymptomPage();renderDashboard();
+}
+function deleteSymptom(id){if(!confirm('确定删除？'))return;state.symptoms=state.symptoms.filter(x=>x.id!==id);saveData();toast('已删除');renderSymptomPage();renderDashboard();}
+
+function renderSymptomPage(){
+  // 类型选择器
+  const sel=document.getElementById('symptomTypeSelector');
+  if(!window._symptomFilter)window._symptomFilter='呕吐';
+  const types=[...new Set(state.symptoms.map(s=>s.type))];
+  sel.innerHTML=SYMPTOM_TYPES.filter(t=>types.includes(t.key)).map(t=>`<div class="metric-chip ${window._symptomFilter===t.key?'active':''}" onclick="window._symptomFilter='${t.key}';renderSymptomPage()">${t.emoji} ${t.key}</div>`).join('');
+  // 频率图
+  const now=new Date();const labels=[],data=[];
+  for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');const cnt=state.symptoms.filter(s=>s.type===window._symptomFilter&&s.date&&s.date.slice(0,7)===mk).length;labels.push((d.getMonth()+1)+'月');data.push(cnt);}
+  const color=SYMPTOM_TYPES.find(t=>t.key===window._symptomFilter)?.color||'#9254de';
+  document.getElementById('freqChart').innerHTML=drawBar(labels,data,color);
+  // 列表
+  const list=document.getElementById('symptomList');
+  if(!state.symptoms.length){list.innerHTML='<div class="empty"><div class="emoji">📝</div><p>暂无症状记录</p></div>';return;}
+  const sorted=[...state.symptoms].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  list.innerHTML=sorted.map(s=>{
+    const cfg=SYMPTOM_TYPES.find(t=>t.key===s.type)||{emoji:'📝'};
+    let desc='';
+    if(s.type==='呕吐'&&s.vomitContent)desc='内容物：'+s.vomitContent+(s.vomitAmount?' · '+s.vomitAmount:'')+(s.vomitCount?' · '+s.vomitCount+'次':'');
+    else if(s.type==='咳嗽'&&s.coughType)desc=s.coughType+(s.coughDuration?' · '+s.coughDuration:'');
+    else if(s.notes)desc=s.notes;
+    const dots=[1,2,3,4,5].map(i=>`<span class="dot ${i<=s.severity?'on':''}"></span>`).join('');
+    return `<div class="list-item"><div class="main" onclick="openSymptomModal('${s.id}')" style="cursor:pointer"><div class="title-row"><span class="title">${cfg.emoji} ${s.type}</span><span class="severity-dots">${dots}</span><span class="tag tag-gray">${s.date}</span></div><div class="date">${s.date} ${s.time}</div>${desc?`<div class="desc">${desc}</div>`:''}${s.images&&s.images.length?`<div class="img-preview-list" style="margin-top:6px">${s.images.map(img=>`<div class="img-preview"><img src="${img}"></div>`).join('')}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-gray" onclick="openSymptomModal('${s.id}')">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteSymptom('${s.id}')">删除</button></div></div>`;
+  }).join('');
+}
+
+/* ===== 用药 ===== */
+function openMedModal(id){
+  document.getElementById('medModal').classList.add('show');
+  document.getElementById('medModalTitle').textContent=id?'编辑用药':'添加用药';
+  document.getElementById('medId').value=id||'';
+  document.getElementById('medName').value='';
+  document.getElementById('medDosage').value='';
+  document.getElementById('medFrequency').value='';
+  document.getElementById('medStart').value=today();
+  document.getElementById('medEnd').value='';
+  document.getElementById('medNotes').value='';
+  if(id){const m=state.medications.find(x=>x.id===id);if(m){document.getElementById('medName').value=m.name;document.getElementById('medDosage').value=m.dosage||'';document.getElementById('medFrequency').value=m.frequency||'';document.getElementById('medStart').value=m.startDate||'';document.getElementById('medEnd').value=m.endDate||'';document.getElementById('medNotes').value=m.notes||'';}}
+}
+function saveMed(){const name=val('medName');if(!name){toast('请输入药名');return;}const id=val('medId');const data={id:id||uid(),name,dosage:val('medDosage'),frequency:val('medFrequency'),startDate:val('medStart'),endDate:val('medEnd'),notes:val('medNotes')};if(id){const i=state.medications.findIndex(x=>x.id===id);state.medications[i]=data;}else{state.medications.push(data);}saveData();closeModal('medModal');toast('保存成功');renderMedPage();renderMedCalendar();renderDashboard();}
+function deleteMed(id){if(!confirm('确定删除？'))return;state.medications=state.medications.filter(x=>x.id!==id);saveData();toast('已删除');renderMedPage();renderMedCalendar();renderDashboard();}
+function renderMedPage(){const list=document.getElementById('medList');if(!state.medications.length){list.innerHTML='<div class="empty"><div class="emoji">💊</div><p>暂无用药记录</p></div>';return;}const t=today();const sorted=[...state.medications].sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));list.innerHTML=sorted.map(m=>{const active=!m.endDate||m.endDate>=t;return `<div class="list-item"><div class="main" onclick="showMedDetail('${m.id}')" style="cursor:pointer"><div class="title-row"><span class="title">💊 ${esc(m.name)}</span><span class="tag ${active?'tag-green':'tag-gray'}">${active?'用药中':'已停药'}</span></div><div class="date">${m.startDate||''} ${m.endDate?'~ '+m.endDate:'~ 至今'}</div>${m.dosage||m.frequency?`<div class="desc">${esc(m.dosage||'')} ${esc(m.frequency||'')}</div>`:''}${m.notes?`<div class="desc">${esc(m.notes)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-gray" onclick="openMedModal('${m.id}')">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteMed('${m.id}')">删除</button></div></div>`;}).join('');}
+
+/* ===== 用药详情弹窗 ===== */
+function showMedDetail(id){
+  const m=state.medications.find(x=>x.id===id);
+  if(!m)return;
+  const t=today();
+  const active=!m.endDate||m.endDate>=t;
+  let html=`<div style="font-size:16px;font-weight:600;margin-bottom:12px">💊 ${esc(m.name)}</div>`;
+  html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="tag ${active?'tag-green':'tag-gray'}">${active?'用药中':'已停药'}</span></div>`;
+  html+=`<div style="background:#f9f0ff;border-radius:8px;padding:12px;margin-bottom:12px">`;
+  html+=`<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">开始日期</span><b>${m.startDate||'未设置'}</b></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">结束日期</span><b>${m.endDate||'至今（用药中）'}</b></div>`;
+  if(m.startDate){
+    const start=new Date(m.startDate);const end=m.endDate?new Date(m.endDate):new Date();
+    const days=Math.floor((end-start)/86400000);
+    html+=`<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">用药时长</span><b>${days}天（约${Math.round(days/30*10)/10}个月）</b></div>`;
+  }
+  html+=`</div>`;
+  if(m.dosage)html+=`<div style="padding:4px 0"><span class="muted">剂量：</span><b>${esc(m.dosage)}</b></div>`;
+  if(m.frequency)html+=`<div style="padding:4px 0"><span class="muted">频次：</span><b>${esc(m.frequency)}</b></div>`;
+  if(m.notes)html+=`<div style="padding:8px 0"><span class="muted">备注：</span><br>${esc(m.notes)}</div>`;
+  html+=`<div style="display:flex;gap:8px;margin-top:16px"><button class="btn" onclick="closeModal('medDetailModal');openMedModal('${m.id}')">编辑</button><button class="btn btn-gray" onclick="closeModal('medDetailModal')">关闭</button></div>`;
+  document.getElementById('medDetailContent').innerHTML=html;
+  document.getElementById('medDetailModal').classList.add('show');
+}
+
+/* ===== 用药日历图（当前+曾用） ===== */
+function renderMedCalendar(){
+  const t=today();
+  const activeMeds=state.medications.filter(m=>!m.endDate||m.endDate>=t);
+  const pastMeds=state.medications.filter(m=>m.endDate&&m.endDate<t);
+  renderMedCalendarBox('medCalendarActive',activeMeds,t);
+  renderMedCalendarBox('medCalendarPast',pastMeds,t);
+}
+function renderMedCalendarBox(boxId,meds,t){
+  const box=document.getElementById(boxId);
+  if(!meds.length){box.innerHTML='<div class="empty" style="padding:20px"><p>暂无记录</p></div>';return;}
+  const now=new Date();
+  const start=new Date(now.getFullYear(),now.getMonth()-2,1);
+  const totalDays=Math.ceil((now-start)/86400000);
+  const colors=['#9254de','#1890ff','#52c41a','#722ed1','#faad14','#ff4d4f','#13c2c2','#eb2f96'];
+  let html='<div style="overflow-x:auto;"><div style="min-width:380px;">';
+  html+='<div style="display:flex;height:20px;margin-bottom:8px;font-size:10px;color:#999;">';
+  for(let i=0;i<3;i++){const d=new Date(start.getFullYear(),start.getMonth()+i,1);html+=`<div style="flex:1;text-align:center;">${d.getMonth()+1}月</div>`;}
+  html+='</div>';
+  meds.forEach((m,i)=>{
+    if(!m.startDate)return;
+    const color=colors[i%colors.length];
+    const ms=new Date(m.startDate),me=m.endDate?new Date(m.endDate):now;
+    const startIdx=Math.max(0,Math.floor((ms-start)/86400000));
+    const endIdx=Math.min(totalDays,Math.floor((me-start)/86400000));
+    const leftPct=(startIdx/totalDays*100).toFixed(1);
+    const widthPct=Math.max(2,((endIdx-startIdx)/totalDays*100)).toFixed(1);
+    const active=!m.endDate||m.endDate>=t;
+    html+=`<div style="margin-bottom:14px;cursor:pointer;" onclick="showMedDetail('${m.id}')"><div style="font-size:12px;margin-bottom:4px;">💊 ${esc(m.name)} <span class="tag ${active?'tag-green':'tag-gray'}">${active?'用药中':'已停药'}</span></div><div style="position:relative;height:24px;background:#f5f5f5;border-radius:4px;"><div style="position:absolute;left:${leftPct}%;width:${widthPct}%;height:100%;background:${color};border-radius:4px;opacity:0.85;"></div><div style="position:absolute;left:${leftPct}%;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;padding:0 6px;white-space:nowrap;z-index:1;">${m.startDate} ~ ${m.endDate||'至今'}</div></div></div>`;
+  });
+  html+='</div></div>';
+  box.innerHTML=html;
+}
+
+/* ===== 热力图 ===== */
+function renderHeatmap(){
+  const box=document.getElementById('heatmap');
+  if(!state.symptoms.length){box.innerHTML='<div class="empty"><div class="emoji">🔥</div><p>暂无症状数据</p></div>';return;}
+  const today=new Date();today.setHours(0,0,0,0);
+  // 近3个月
+  const threeMonthsAgo=new Date(today);threeMonthsAgo.setMonth(threeMonthsAgo.getMonth()-3);
+  const threeMonthsAgoStr=threeMonthsAgo.toISOString().slice(0,10);
+  const recentSymptoms=state.symptoms.filter(s=>s.date&&s.date>=threeMonthsAgoStr);
+  if(!recentSymptoms.length){box.innerHTML='<div class="empty"><p>近3个月无症状记录</p></div>';return;}
+  const start=new Date(today);start.setDate(start.getDate()-start.getDay()-12*7);
+  const weekDays=['日','一','二','三','四','五','六'];
+  const heatColors=['#f5f5f5','#ffe7e7','#ffccc7','#ff7875','#ff4d4f'];
+  let html='';
+  SYMPTOM_TYPES.forEach(t=>{
+    const typeSymptoms=recentSymptoms.filter(s=>s.type===t.key);
+    if(!typeSymptoms.length)return;
+    const counts={};
+    typeSymptoms.forEach(s=>{if(s.date)counts[s.date]=(counts[s.date]||0)+1;});
+    html+=`<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px;color:${t.color}">${t.emoji} ${t.key} <span style="color:#999;font-weight:400">(${typeSymptoms.length}次)</span></div>`;
+    html+='<div style="overflow-x:auto;"><div style="display:flex;gap:3px;min-width:300px;">';
+    html+='<div style="display:flex;flex-direction:column;gap:3px;font-size:9px;color:#999;margin-right:4px;padding-top:20px;">';
+    weekDays.forEach(d=>{html+=`<div style="height:18px;line-height:18px;">${d}</div>`;});
+    html+='</div>';
+    for(let w=0;w<13;w++){
+      html+='<div style="display:flex;flex-direction:column;gap:3px;">';
+      if(w%4===0||w===12){const d=new Date(start);d.setDate(d.getDate()+w*7);html+=`<div style="height:18px;font-size:8px;color:#999;text-align:center;">${d.getMonth()+1}/${d.getDate()}</div>`;}else html+='<div style="height:18px;"></div>';
+      for(let day=0;day<7;day++){
+        const date=new Date(start);date.setDate(date.getDate()+w*7+day);
+        const ds=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+        const cnt=counts[ds]||0;
+        const future=date>today;
+        let bg='#f5f5f5';
+        if(!future&&cnt>0){bg=cnt>=4?heatColors[4]:heatColors[cnt];}
+        html+=`<div style="width:16px;height:16px;border-radius:3px;background:${bg};" title="${ds}: ${cnt}次"></div>`;
+      }
+      html+='</div>';
+    }
+    html+='</div></div>';
+    html+='</div>';
+  });
+  if(!html)html='<div class="empty"><p>近3个月无症状记录</p></div>';
+  // 图例
+  html+='<div style="display:flex;align-items:center;gap:4px;margin-top:8px;font-size:10px;color:#999;justify-content:flex-end;"><span>少</span><span style="width:12px;height:12px;border-radius:2px;background:#f5f5f5;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ffe7e7;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ffccc7;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ff7875;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ff4d4f;display:inline-block;"></span><span>多</span></div>';
+  box.innerHTML=html;
+}
+
+/* ===== 体重 ===== */
+function openWeightModal(){document.getElementById('weightModal').classList.add('show');document.getElementById('weightDate').value=today();document.getElementById('weightValue').value='';document.getElementById('weightNote').value='';}
+function saveWeight(){const date=val('weightDate');const value=parseFloat(val('weightValue'));if(!date){toast('请选日期');return;}if(!value){toast('请输入体重');return;}state.weights.push({id:uid(),date,value,note:val('weightNote')});saveData();closeModal('weightModal');toast('保存成功');renderWeightPage();renderDashboard();}
+function deleteWeight(id){if(!confirm('确定删除？'))return;state.weights=state.weights.filter(x=>x.id!==id);saveData();toast('已删除');renderWeightPage();renderDashboard();}
+function renderWeightPage(){
+  const sorted=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
+  const summary=document.getElementById('weightSummary');
+  if(!sorted.length){summary.innerHTML='<div class="empty"><div class="emoji">⚖️</div><p>暂无体重记录</p></div>';document.getElementById('weightChart').innerHTML='';document.getElementById('weightList').innerHTML='';return;}
+  const latest=sorted[sorted.length-1];
+  // 基准点：6个月前的体重
+  const now=new Date();
+  const sixMonthsAgo=new Date(now);sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+  const sixMonthsAgoStr=sixMonthsAgo.toISOString().slice(0,10);
+  const refWeight=sorted.find(w=>w.date<=sixMonthsAgoStr);
+  // 基准线：3个月内体重平均值
+  const threeMonthsAgo=new Date(now);threeMonthsAgo.setMonth(threeMonthsAgo.getMonth()-3);
+  const threeMonthsAgoStr=threeMonthsAgo.toISOString().slice(0,10);
+  const recentWeights=sorted.filter(w=>w.date>=threeMonthsAgoStr);
+  const baseline=recentWeights.length?+(recentWeights.reduce((s,w)=>s+w.value,0)/recentWeights.length).toFixed(2):latest.value;
+
+  let changeStr='-',pctStr='-',changeColor='#999';
+  if(refWeight){
+    const change=+(latest.value-refWeight.value).toFixed(2);
+    const pct=refWeight.value?+(change/refWeight.value*100).toFixed(1):0;
+    changeStr=(change>0?'+':'')+change;pctStr=(pct>0?'+':'')+pct+'%';
+    changeColor=change<0?'#52c41a':change>0?'#ff4d4f':'#999';
+  }
+
+  summary.innerHTML=`<div style="display:flex;justify-content:space-around;text-align:center;margin:10px 0;flex-wrap:wrap;gap:10px"><div><div style="font-size:28px;font-weight:700;color:#9254de">${latest.value}</div><div class="muted">kg 最新</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${changeStr}</div><div class="muted">kg 较6个月前</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${pctStr}</div><div class="muted">变化率</div></div><div><div style="font-size:28px;font-weight:700;color:#722ed1">${baseline}</div><div class="muted">kg 3月均值</div></div></div>`;
+  // 趋势图只显示近6个月
+  const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
+  const chartData=sixMonthsData.length?sixMonthsData:sorted;
+  document.getElementById('weightChart').innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#9254de',data:chartData.map(w=>w.value)}]);
+  const list=document.getElementById('weightList');const rev=[...sorted].reverse();
+  list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
+}
+
+/* ===== 日历 ===== */
+function changeMonth(d){calMonth+=d;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCalendar();}
+function renderCalendar(){
+  const monthPrefix=calYear+'-'+String(calMonth+1).padStart(2,'0');
+  const firstDay=new Date(calYear,calMonth,1);const startWeekday=firstDay.getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const todayStr=today();
+  document.getElementById('calTitle').textContent=calYear+'年'+(calMonth+1)+'月';
+  document.getElementById('calWeekHeader').innerHTML=['日','一','二','三','四','五','六'].map(w=>`<div class="cal-week">${w}</div>`).join('');
+  const monthSymptoms=state.symptoms.filter(s=>s.date&&s.date.slice(0,7)===monthPrefix);
+  const monthVomit=monthSymptoms.filter(s=>s.type==='呕吐').length;
+  const monthCough=monthSymptoms.filter(s=>s.type==='咳嗽').length;
+  document.getElementById('calStats').innerHTML=`<div><div class="cal-stat-num text-danger">${monthVomit}</div><div class="cal-stat-label">呕吐</div></div><div><div class="cal-stat-num" style="color:#faad14">${monthCough}</div><div class="cal-stat-label">咳嗽</div></div><div><div class="cal-stat-num" style="color:#9254de">${monthSymptoms.length}</div><div class="cal-stat-label">总计</div></div>`;
+  let html='';
+  for(let i=0;i<startWeekday;i++)html+='<div class="cal-cell" style="background:transparent"></div>';
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=monthPrefix+'-'+String(d).padStart(2,'0');
+    const daySymptoms=state.symptoms.filter(s=>s.date===dateStr);
+    const cnt=daySymptoms.length;
+    const hasVomit=daySymptoms.some(s=>s.type==='呕吐');
+    const hasCough=daySymptoms.some(s=>s.type==='咳嗽');
+    const hasOther=cnt>0&&!hasVomit&&!hasCough;
+    let cls='cal-cell';if(dateStr===todayStr)cls+=' today';
+    if(hasVomit)cls='cal-cell vomit';else if(hasCough)cls='cal-cell cough';else if(hasOther)cls='cal-cell other';
+    html+=`<div class="${cls}" onclick="selectDay('${dateStr}')"><span>${d}</span>${cnt?`<span style="font-size:9px;opacity:.8;margin-top:1px">${cnt}</span>`:''}</div>`;
+  }
+  document.getElementById('calGrid').innerHTML=html;
+  document.getElementById('dayDetailCard').style.display='none';
+}
+function selectDay(date){
+  const daySymptoms=state.symptoms.filter(s=>s.date===date).sort((a,b)=>a.time.localeCompare(b.time));
+  const card=document.getElementById('dayDetailCard');
+  card.style.display='block';
+  document.getElementById('dayDetailTitle').textContent='📋 '+date+' 症状记录';
+  if(!daySymptoms.length){document.getElementById('dayDetailContent').innerHTML='<div class="empty"><p>当日无症状</p></div>';}
+  else{
+  document.getElementById('dayDetailContent').innerHTML=daySymptoms.map(s=>{
+    const cfg=SYMPTOM_TYPES.find(t=>t.key===s.type)||{emoji:'📝'};
+    let desc='';
+    if(s.type==='呕吐'&&s.vomitContent)desc='内容物：'+s.vomitContent+(s.vomitAmount?' · '+s.vomitAmount:'');
+    else if(s.type==='咳嗽'&&s.coughType)desc=s.coughType;
+    else if(s.notes)desc=s.notes;
+    return `<div class="list-item" onclick="openSymptomModal('${s.id}')"><div class="main"><div class="title-row"><span class="title">${cfg.emoji} ${s.type}</span><span class="tag tag-gray">${s.time}</span></div>${desc?`<div class="desc">${desc}</div>`:''}</div></div>`;
+  }).join('');
+  }
+  setTimeout(()=>{document.getElementById('dayDetailCard').scrollIntoView({behavior:'smooth'});},100);
+}
+
+/* ===== 仪表盘 ===== */
+function renderDashboard(){
+  renderCatBar();
+  const t=today();const month=t.slice(0,7);
+  const ms=state.symptoms.filter(s=>s.date&&s.date.slice(0,7)===month);
+  const mv=ms.filter(s=>s.type==='呕吐').length;
+  const ws=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
+  const curWeight=ws.length?ws[ws.length-1].value:'-';
+  document.getElementById('statGrid').innerHTML=`<div class="stat-card"><div class="num ${mv>=5?'danger':mv>=3?'warning':'success'}">${mv}</div><div class="label">本月呕吐次数</div></div><div class="stat-card"><div class="num" style="color:#9254de">${curWeight}</div><div class="label">当前体重(kg)</div></div>`;
+  // 呕吐频率
+  const now=new Date();const vlabels=[],vdata=[];
+  for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');vlabels.push((d.getMonth()+1)+'月');vdata.push(state.symptoms.filter(s=>s.type==='呕吐'&&s.date&&s.date.slice(0,7)===mk).length);}
+  document.getElementById('dashVomitChart').innerHTML=drawBar(vlabels,vdata,'#ff4d4f');
+  // 体重趋势（近6个月）
+  const sixMonthsAgo=new Date(now);sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+  const sixMonthsAgoStr=sixMonthsAgo.toISOString().slice(0,10);
+  const recentWs=ws.filter(w=>w.date>=sixMonthsAgoStr);
+  const chartWs=recentWs.length?recentWs:ws;
+  document.getElementById('dashWeightChart').innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#9254de',data:chartWs.map(w=>w.value)}]):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
+  // 最近症状
+  const recent=[...state.symptoms].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time)).slice(0,5);
+  document.getElementById('recentSymptoms').innerHTML=recent.length?recent.map(s=>{const cfg=SYMPTOM_TYPES.find(t=>t.key===s.type)||{emoji:'📝'};let desc='';if(s.type==='呕吐'&&s.vomitContent)desc=s.vomitContent;else if(s.notes)desc=s.notes;return `<div class="list-item" onclick="openSymptomModal('${s.id}')" style="cursor:pointer"><div class="main"><div class="title-row"><span class="title">${cfg.emoji} ${s.type}</span><span class="tag tag-gray">${s.date}</span></div>${desc?`<div class="desc">${desc}</div>`:''}</div></div>`;}).join(''):'<div class="empty" style="padding:20px"><p>暂无症状记录</p></div>';
+  // 用药
+  const am=state.medications.filter(m=>!m.endDate||m.endDate>=t);
+  if(am.length){document.getElementById('medCard').style.display='block';document.getElementById('recentMeds').innerHTML=am.map(m=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">💊 ${esc(m.name)}</span></div><div class="date">${esc(m.dosage||'')} ${esc(m.frequency||'')}</div></div></div>`).join('');}else document.getElementById('medCard').style.display='none';
+}
+
+/* ===== 图表 ===== */
+function drawBar(labels,data,color){
+  if(!labels.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
+  const w=Math.max(320,labels.length*36),h=180;const pad={t:20,r:12,b:32,l:32};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  const max=Math.max(...data,1)*1.2;const slot=cw/data.length,barW=slot*0.6;
+  const yS=v=>pad.t+ch-(v/max)*ch;
+  let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
+  for(let i=0;i<=4;i++){const y=pad.t+(ch/4)*i;const v=Math.round(max-(max/4)*i);svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-4}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v}</text>`;}
+  data.forEach((v,i)=>{const x=pad.l+i*slot+(slot-barW)/2;const y=yS(v);const bh=pad.t+ch-y;const c=v>=5?'#ff4d4f':v>=3?'#faad14':color;if(v>0){svg+=`<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${c}" rx="3"/>`;svg+=`<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${c}">${v}</text>`;}});
+  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${pad.l+i*slot+slot/2}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
+  svg+='</svg>';return svg;
+}
+function drawLine(labels,series){
+  if(!labels.length||!series.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
+  const w=Math.max(320,labels.length*36),h=200;const pad={t:28,r:16,b:36,l:42};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  let yMax=-Infinity,yMin=Infinity;series.forEach(s=>s.data.forEach(v=>{if(v!=null){if(v>yMax)yMax=v;if(v<yMin)yMin=v;}}));
+  if(!isFinite(yMax)){yMax=1;yMin=0;}if(yMin>0)yMin=0;yMax=yMax*1.15;
+  const yR=yMax-yMin||1;const xS=labels.length>1?cw/(labels.length-1):0;
+  const xS2=i=>pad.l+i*xS;const yS2=v=>pad.t+ch-((v-yMin)/yR)*ch;
+  let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
+  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yR/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v.toFixed(1)}</text>`;}
+  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
+  series.forEach(s=>{svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i)+','+yS2(v):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;s.data.forEach((v,i)=>{if(v!=null)svg+=`<circle cx="${xS2(i)}" cy="${yS2(v)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;});});
+  let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="8" width="12" height="3" fill="${s.color}" rx="1"/><text x="${lx+16}" y="13" font-size="10" fill="#666">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
+  svg+='</svg>';return svg;
+}
+
+/* ===== 数据管理 ===== */
+function exportExcel(){
+  if(typeof XLSX==='undefined'){toast('Excel库加载中');return;}
+  let wb=XLSX.utils.book_new();
+  // 症状
+  let rows=state.symptoms.map(s=>({日期:s.date,时间:s.time,类型:s.type,严重程度:s.severity,呕吐内容物:s.vomitContent||'',呕吐量:s.vomitAmount||'',呕吐次数:s.vomitCount||'',咳嗽类型:s.coughType||'',持续时间:s.coughDuration||'',备注:s.notes||''}));
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'症状记录');
+  rows=state.medications.map(m=>({药物名称:m.name,剂量:m.dosage||'',频次:m.frequency||'',开始日期:m.startDate||'',结束日期:m.endDate||'',备注:m.notes||''}));
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'用药记录');
+  rows=state.weights.map(w=>({日期:w.date,体重kg:w.value,备注:w.note||''}));
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'体重记录');
+  if(!wb.SheetNames.length){toast('没有可导出的数据');return;}
+  XLSX.writeFile(wb,`猫咪症状数据_${today()}.xlsx`);toast('已导出');
+}
+function exportJSON(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`猫咪症状备份_${today()}.json`;a.click();URL.revokeObjectURL(url);toast('已导出');}
+function importJSON(file){const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.symptoms)throw 0;if(confirm('将合并导入数据，是否继续？')){state=Object.assign(state,d);saveData();toast('导入成功');switchPage('dashboard');}}catch(e){toast('格式错误');}};r.readAsText(file);}
+function confirmClear(){if(!confirm('⚠️ 将清空所有数据！确定？'))return;if(!confirm('再次确认：真的清空？'))return;state={cat:state.cat,symptoms:[],medications:[],weights:[]};saveData();toast('已清空');renderDashboard();}
+function loadSampleData(){
+  if(state.symptoms.length)if(!confirm('将合并示例数据，是否继续？'))return;
+  state.cat={name:'橘子',breed:'橘猫',birthDate:'2021-05-10',gender:'公',neutered:'已绝育'};
+  const contents=['未消化食物','黄色胆汁','毛球','白色泡沫'];const amounts=['少量','中等','较多'];
+  const now=new Date();
+  for(let i=0;i<90;i++){if(Math.random()>0.7){const d=new Date(now);d.setDate(d.getDate()-i);const ds=today2(d);const cnt=Math.floor(Math.random()*2)+1;for(let j=0;j<cnt;j++){const h=6+Math.floor(Math.random()*16),m=Math.floor(Math.random()*60);const isV=Math.random()>0.3;state.symptoms.push({id:uid(),type:isV?'呕吐':(Math.random()>0.5?'咳嗽':'腹泻'),date:ds,time:String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'),severity:Math.floor(Math.random()*5)+1,vomitContent:isV?contents[Math.floor(Math.random()*4)]:'',vomitAmount:isV?amounts[Math.floor(Math.random()*3)]:'',vomitCount:isV?String(Math.floor(Math.random()*3)+1):'',coughType:!isV&&Math.random()>0.5?'干咳':'',coughDuration:!isV?Math.floor(Math.random()*10)+'分钟':'',notes:'',images:[]});}}}
+  state.medications.push({id:uid(),name:'化毛膏',dosage:'5cm',frequency:'每周2次',startDate:today(),endDate:'',notes:'预防毛球'});
+  state.medications.push({id:uid(),name:'益生菌',dosage:'1包',frequency:'每日1次',startDate:today(),endDate:'',notes:'调理肠胃'});
+  for(let i=0;i<12;i++){const d=new Date(now);d.setDate(d.getDate()-i*7);state.weights.push({id:uid(),date:today2(d),value:+(4.5-i*0.05+Math.random()*0.1).toFixed(2),note:''});}
+  saveData();toast('已加载示例数据');renderDashboard();
+}
+function today2(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+/* ===== 初始化 ===== */
+loadData();
+initSymptomTypes();
+initSync();
+document.getElementById('symptomImages').addEventListener('change',function(){handleSymptomImages(this);});
+document.getElementById('importJSON').addEventListener('change',function(){if(this.files[0])importJSON(this.files[0]);});
+renderDashboard();
+</script>
+</body>
+</html>
