@@ -155,8 +155,14 @@ input[type=file]{display:none}
   <!-- 用药 -->
   <div class="page" id="page-medications">
     <div class="card">
-      <div class="card-title"><span>📅 用药日历</span></div>
-      <div id="medCalendar"></div>
+      <div class="card-title"><span>📅 当前用药日历</span></div>
+      <p class="muted" style="margin-bottom:8px">显示正在使用的用药时长区间</p>
+      <div id="medCalendarActive"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📋 曾用药日历</span></div>
+      <p class="muted" style="margin-bottom:8px">显示已停药的用药时长区间</p>
+      <div id="medCalendarPast"></div>
     </div>
     <div class="card">
       <div class="card-title"><span>💊 用药记录</span><button class="btn btn-sm" onclick="openMedModal()">+ 添加</button></div>
@@ -206,7 +212,7 @@ input[type=file]{display:none}
   <!-- 数据 -->
   <div class="page" id="page-data">
     <div class="card">
-      <div class="card-title"><span>🔥 症状热力图</span></div>
+      <div class="card-title"><span>🔥 症状热力图（三个月内）</span></div>
       <p class="muted" style="margin-bottom:10px">颜色越深表示当日症状越多，直观查看症状频率分布</p>
       <div id="heatmap"></div>
     </div>
@@ -333,6 +339,14 @@ input[type=file]{display:none}
   </div>
 </div>
 
+<!-- 用药详情弹窗 -->
+<div class="modal-mask" id="medDetailModal">
+  <div class="modal">
+    <div class="modal-header"><h3>📋 用药详情</h3><button class="modal-close" onclick="closeModal('medDetailModal')">×</button></div>
+    <div id="medDetailContent"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -340,7 +354,7 @@ const KEY='cat_symptom_v1';
 let state={cat:{name:'',breed:'',birthDate:'',gender:'公',neutered:'已绝育'},symptoms:[],medications:[],weights:[]};
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
 let editingImages=[];
-const SYMPTOM_TYPES=[{key:'呕吐',emoji:'🤮',color:'#ff4d4f'},{key:'咳嗽',emoji:'😷',color:'#faad14'},{key:'腹泻',emoji:'💩',color:'#fa8c16'},{key:'排尿异常',emoji:'🚽',color:'#eb2f96'},{key:'其他',emoji:'📝',color:'#8c8c8c'}];
+const SYMPTOM_TYPES=[{key:'呕吐',emoji:'🤮',color:'#ff4d4f'},{key:'咳嗽',emoji:'😷',color:'#faad14'},{key:'腹泻',emoji:'💩',color:'#fa8c16'},{key:'尿频',emoji:'🚽',color:'#eb2f96'},{key:'排尿异常',emoji:'💧',color:'#13c2c2'},{key:'其他',emoji:'📝',color:'#8c8c8c'}];
 const VOMIT_CONTENTS=[{key:'未消化食物',emoji:'🍖'},{key:'黄色胆汁',emoji:'🟡'},{key:'白色泡沫',emoji:'⚪'},{key:'毛球',emoji:'🧶'},{key:'带血红色',emoji:'🔴'},{key:'透明水样',emoji:'💧'},{key:'其他',emoji:'❓'}];
 const SEVERITY_HINTS={1:'轻微，几乎不影响',2:'较轻，稍有不适',3:'中等，有些影响',4:'较重，明显不适',5:'严重，需就医'};
 
@@ -567,13 +581,44 @@ function openMedModal(id){
 }
 function saveMed(){const name=val('medName');if(!name){toast('请输入药名');return;}const id=val('medId');const data={id:id||uid(),name,dosage:val('medDosage'),frequency:val('medFrequency'),startDate:val('medStart'),endDate:val('medEnd'),notes:val('medNotes')};if(id){const i=state.medications.findIndex(x=>x.id===id);state.medications[i]=data;}else{state.medications.push(data);}saveData();closeModal('medModal');toast('保存成功');renderMedPage();renderMedCalendar();renderDashboard();}
 function deleteMed(id){if(!confirm('确定删除？'))return;state.medications=state.medications.filter(x=>x.id!==id);saveData();toast('已删除');renderMedPage();renderMedCalendar();renderDashboard();}
-function renderMedPage(){const list=document.getElementById('medList');const t=today();const activeMeds=state.medications.filter(m=>!m.endDate||m.endDate>=t);if(!activeMeds.length){list.innerHTML='<div class="empty"><div class="emoji">💊</div><p>暂无当前用药</p></div>';return;}const sorted=[...activeMeds].sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));list.innerHTML=sorted.map(m=>{return `<div class="list-item"><div class="main"><div class="title-row"><span class="title">💊 ${esc(m.name)}</span><span class="tag tag-green">用药中</span></div><div class="date">${m.startDate||''} ${m.endDate?'~ '+m.endDate:'~ 至今'}</div>${m.dosage||m.frequency?`<div class="desc">${esc(m.dosage||'')} ${esc(m.frequency||'')}</div>`:''}${m.notes?`<div class="desc">${esc(m.notes)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-gray" onclick="openMedModal('${m.id}')">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteMed('${m.id}')">删除</button></div></div>`;}).join('');}
+function renderMedPage(){const list=document.getElementById('medList');if(!state.medications.length){list.innerHTML='<div class="empty"><div class="emoji">💊</div><p>暂无用药记录</p></div>';return;}const t=today();const sorted=[...state.medications].sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));list.innerHTML=sorted.map(m=>{const active=!m.endDate||m.endDate>=t;return `<div class="list-item"><div class="main" onclick="showMedDetail('${m.id}')" style="cursor:pointer"><div class="title-row"><span class="title">💊 ${esc(m.name)}</span><span class="tag ${active?'tag-green':'tag-gray'}">${active?'用药中':'已停药'}</span></div><div class="date">${m.startDate||''} ${m.endDate?'~ '+m.endDate:'~ 至今'}</div>${m.dosage||m.frequency?`<div class="desc">${esc(m.dosage||'')} ${esc(m.frequency||'')}</div>`:''}${m.notes?`<div class="desc">${esc(m.notes)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-gray" onclick="openMedModal('${m.id}')">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteMed('${m.id}')">删除</button></div></div>`;}).join('');}
 
-/* ===== 用药日历图 ===== */
+/* ===== 用药详情弹窗 ===== */
+function showMedDetail(id){
+  const m=state.medications.find(x=>x.id===id);
+  if(!m)return;
+  const t=today();
+  const active=!m.endDate||m.endDate>=t;
+  let html=`<div style="font-size:16px;font-weight:600;margin-bottom:12px">💊 ${esc(m.name)}</div>`;
+  html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="tag ${active?'tag-green':'tag-gray'}">${active?'用药中':'已停药'}</span></div>`;
+  html+=`<div style="background:#f9f0ff;border-radius:8px;padding:12px;margin-bottom:12px">`;
+  html+=`<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">开始日期</span><b>${m.startDate||'未设置'}</b></div>`;
+  html+=`<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">结束日期</span><b>${m.endDate||'至今（用药中）'}</b></div>`;
+  if(m.startDate){
+    const start=new Date(m.startDate);const end=m.endDate?new Date(m.endDate):new Date();
+    const days=Math.floor((end-start)/86400000);
+    html+=`<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="muted">用药时长</span><b>${days}天（约${Math.round(days/30*10)/10}个月）</b></div>`;
+  }
+  html+=`</div>`;
+  if(m.dosage)html+=`<div style="padding:4px 0"><span class="muted">剂量：</span><b>${esc(m.dosage)}</b></div>`;
+  if(m.frequency)html+=`<div style="padding:4px 0"><span class="muted">频次：</span><b>${esc(m.frequency)}</b></div>`;
+  if(m.notes)html+=`<div style="padding:8px 0"><span class="muted">备注：</span><br>${esc(m.notes)}</div>`;
+  html+=`<div style="display:flex;gap:8px;margin-top:16px"><button class="btn" onclick="closeModal('medDetailModal');openMedModal('${m.id}')">编辑</button><button class="btn btn-gray" onclick="closeModal('medDetailModal')">关闭</button></div>`;
+  document.getElementById('medDetailContent').innerHTML=html;
+  document.getElementById('medDetailModal').classList.add('show');
+}
+
+/* ===== 用药日历图（当前+曾用） ===== */
 function renderMedCalendar(){
-  const box=document.getElementById('medCalendar');
-  const meds=state.medications;
-  if(!meds.length){box.innerHTML='<div class="empty"><div class="emoji">💊</div><p>暂无用药记录</p></div>';return;}
+  const t=today();
+  const activeMeds=state.medications.filter(m=>!m.endDate||m.endDate>=t);
+  const pastMeds=state.medications.filter(m=>m.endDate&&m.endDate<t);
+  renderMedCalendarBox('medCalendarActive',activeMeds,t);
+  renderMedCalendarBox('medCalendarPast',pastMeds,t);
+}
+function renderMedCalendarBox(boxId,meds,t){
+  const box=document.getElementById(boxId);
+  if(!meds.length){box.innerHTML='<div class="empty" style="padding:20px"><p>暂无记录</p></div>';return;}
   const now=new Date();
   const start=new Date(now.getFullYear(),now.getMonth()-2,1);
   const totalDays=Math.ceil((now-start)/86400000);
@@ -590,8 +635,8 @@ function renderMedCalendar(){
     const endIdx=Math.min(totalDays,Math.floor((me-start)/86400000));
     const leftPct=(startIdx/totalDays*100).toFixed(1);
     const widthPct=Math.max(2,((endIdx-startIdx)/totalDays*100)).toFixed(1);
-    const active=!m.endDate||m.endDate>=today();
-    html+=`<div style="margin-bottom:14px;"><div style="font-size:12px;margin-bottom:4px;">💊 ${esc(m.name)} ${active?'<span class="tag tag-green">用药中</span>':'<span class="tag tag-gray">已停药</span>'}</div><div style="position:relative;height:24px;background:#f5f5f5;border-radius:4px;"><div style="position:absolute;left:${leftPct}%;width:${widthPct}%;height:100%;background:${color};border-radius:4px;opacity:0.85;"></div><div style="position:absolute;left:${leftPct}%;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;padding:0 6px;white-space:nowrap;z-index:1;">${m.startDate} ~ ${m.endDate||'至今'}</div></div></div>`;
+    const active=!m.endDate||m.endDate>=t;
+    html+=`<div style="margin-bottom:14px;cursor:pointer;" onclick="showMedDetail('${m.id}')"><div style="font-size:12px;margin-bottom:4px;">💊 ${esc(m.name)} <span class="tag ${active?'tag-green':'tag-gray'}">${active?'用药中':'已停药'}</span></div><div style="position:relative;height:24px;background:#f5f5f5;border-radius:4px;"><div style="position:absolute;left:${leftPct}%;width:${widthPct}%;height:100%;background:${color};border-radius:4px;opacity:0.85;"></div><div style="position:absolute;left:${leftPct}%;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;padding:0 6px;white-space:nowrap;z-index:1;">${m.startDate} ~ ${m.endDate||'至今'}</div></div></div>`;
   });
   html+='</div></div>';
   box.innerHTML=html;
@@ -601,34 +646,46 @@ function renderMedCalendar(){
 function renderHeatmap(){
   const box=document.getElementById('heatmap');
   if(!state.symptoms.length){box.innerHTML='<div class="empty"><div class="emoji">🔥</div><p>暂无症状数据</p></div>';return;}
-  const weeks=12;
   const today=new Date();today.setHours(0,0,0,0);
-  const start=new Date(today);
-  start.setDate(start.getDate()-start.getDay()-(weeks-1)*7);
-  const counts={};
-  state.symptoms.forEach(s=>{if(s.date)counts[s.date]=(counts[s.date]||0)+1;});
+  // 近3个月
+  const threeMonthsAgo=new Date(today);threeMonthsAgo.setMonth(threeMonthsAgo.getMonth()-3);
+  const threeMonthsAgoStr=threeMonthsAgo.toISOString().slice(0,10);
+  const recentSymptoms=state.symptoms.filter(s=>s.date&&s.date>=threeMonthsAgoStr);
+  if(!recentSymptoms.length){box.innerHTML='<div class="empty"><p>近3个月无症状记录</p></div>';return;}
+  const start=new Date(today);start.setDate(start.getDate()-start.getDay()-12*7);
   const weekDays=['日','一','二','三','四','五','六'];
-  let html='<div style="overflow-x:auto;"><div style="display:flex;gap:3px;min-width:340px;">';
-  html+='<div style="display:flex;flex-direction:column;gap:3px;font-size:9px;color:#999;margin-right:4px;padding-top:20px;">';
-  weekDays.forEach(d=>{html+=`<div style="height:18px;line-height:18px;">${d}</div>`;});
-  html+='</div>';
-  for(let w=0;w<weeks;w++){
-    html+='<div style="display:flex;flex-direction:column;gap:3px;">';
-    if(w%4===0||w===weeks-1){const d=new Date(start);d.setDate(d.getDate()+w*7);html+=`<div style="height:18px;font-size:8px;color:#999;text-align:center;">${d.getMonth()+1}/${d.getDate()}</div>`;}else html+='<div style="height:18px;"></div>';
-    for(let day=0;day<7;day++){
-      const date=new Date(start);date.setDate(date.getDate()+w*7+day);
-      const ds=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
-      const cnt=counts[ds]||0;
-      const future=date>today;
-      let bg='#f0f0f0';
-      if(!future){if(cnt===0)bg='#f5f5f5';else if(cnt===1)bg='#ffe7e7';else if(cnt===2)bg='#ffccc7';else if(cnt===3)bg='#ff7875';else bg='#ff4d4f';}
-      html+=`<div style="width:18px;height:18px;border-radius:3px;background:${bg};" title="${ds}: ${cnt}次"></div>`;
-    }
+  const heatColors=['#f5f5f5','#ffe7e7','#ffccc7','#ff7875','#ff4d4f'];
+  let html='';
+  SYMPTOM_TYPES.forEach(t=>{
+    const typeSymptoms=recentSymptoms.filter(s=>s.type===t.key);
+    if(!typeSymptoms.length)return;
+    const counts={};
+    typeSymptoms.forEach(s=>{if(s.date)counts[s.date]=(counts[s.date]||0)+1;});
+    html+=`<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px;color:${t.color}">${t.emoji} ${t.key} <span style="color:#999;font-weight:400">(${typeSymptoms.length}次)</span></div>`;
+    html+='<div style="overflow-x:auto;"><div style="display:flex;gap:3px;min-width:300px;">';
+    html+='<div style="display:flex;flex-direction:column;gap:3px;font-size:9px;color:#999;margin-right:4px;padding-top:20px;">';
+    weekDays.forEach(d=>{html+=`<div style="height:18px;line-height:18px;">${d}</div>`;});
     html+='</div>';
-  }
-  html+='</div>';
-  html+='<div style="display:flex;align-items:center;gap:4px;margin-top:10px;font-size:10px;color:#999;justify-content:flex-end;"><span>少</span><span style="width:12px;height:12px;border-radius:2px;background:#f5f5f5;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ffe7e7;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ffccc7;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ff7875;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ff4d4f;display:inline-block;"></span><span>多</span></div>';
-  html+='</div>';
+    for(let w=0;w<13;w++){
+      html+='<div style="display:flex;flex-direction:column;gap:3px;">';
+      if(w%4===0||w===12){const d=new Date(start);d.setDate(d.getDate()+w*7);html+=`<div style="height:18px;font-size:8px;color:#999;text-align:center;">${d.getMonth()+1}/${d.getDate()}</div>`;}else html+='<div style="height:18px;"></div>';
+      for(let day=0;day<7;day++){
+        const date=new Date(start);date.setDate(date.getDate()+w*7+day);
+        const ds=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+        const cnt=counts[ds]||0;
+        const future=date>today;
+        let bg='#f5f5f5';
+        if(!future&&cnt>0){bg=cnt>=4?heatColors[4]:heatColors[cnt];}
+        html+=`<div style="width:16px;height:16px;border-radius:3px;background:${bg};" title="${ds}: ${cnt}次"></div>`;
+      }
+      html+='</div>';
+    }
+    html+='</div></div>';
+    html+='</div>';
+  });
+  if(!html)html='<div class="empty"><p>近3个月无症状记录</p></div>';
+  // 图例
+  html+='<div style="display:flex;align-items:center;gap:4px;margin-top:8px;font-size:10px;color:#999;justify-content:flex-end;"><span>少</span><span style="width:12px;height:12px;border-radius:2px;background:#f5f5f5;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ffe7e7;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ffccc7;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ff7875;display:inline-block;"></span><span style="width:12px;height:12px;border-radius:2px;background:#ff4d4f;display:inline-block;"></span><span>多</span></div>';
   box.innerHTML=html;
 }
 
