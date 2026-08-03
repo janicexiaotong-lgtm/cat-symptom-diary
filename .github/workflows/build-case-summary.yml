@@ -1,0 +1,43 @@
+name: Build case summary dashboard
+
+# 当病例源数据或构建脚本发生变化时，自动重新生成 case-summary.html 并提交，
+# GitHub Pages 随之更新 —— 猫咪症状日记里的「病例汇总」入口永远指向最新数据。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'case-data/**'
+      - 'build_case_summary.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --upgrade pip pandas openpyxl plotly
+
+      - name: Build dashboard
+        run: python build_case_summary.py
+
+      - name: Commit updated dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add case-summary.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "auto: rebuild case-summary.html from latest case data"
+            git push
+          fi

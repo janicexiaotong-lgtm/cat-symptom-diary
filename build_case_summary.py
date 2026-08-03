@@ -84,12 +84,16 @@ def iris_stage(v):
     return "1" if v < 140 else "2" if v < 250 else "3" if v < 440 else "4"
 
 # ---------- 3. 病例概要（零背景医生速览） ----------
-frac_n = int(events["病史"].str.contains("骨折", na=False).sum())
+# 骨折手术次数：源表按"就诊行"计数会漏算——首行"2次桡尺骨骨折手术"含 ①② 两次，
+# 加第3次(③)、第4次(④) 共 4 次；麻醉次数来自临床记录汇总（源表未单列麻醉列）。
+FRACTURE_SURGERIES = 4
+ANESTHESIA_TIMES = 7
 has_uro = bool(events["病史"].str.contains("输尿管梗阻", na=False).any())
 has_fic = bool(events["病史"].str.contains("FIC", na=False).any())
 has_ent = bool(events["病史"].str.contains("肠炎", na=False).any())
 facts = [f"主线诊断：慢性肾病 <b>CKD</b>（以 IRIS 3 期为主，最新肌酐 {crea_latest:.0f} μmol/L）"]
-if frac_n: facts.append(f"骨骼：反复桡尺骨骨折手术共 <b>{frac_n}</b> 次")
+if FRACTURE_SURGERIES: facts.append(f"骨骼：反复桡尺骨骨折手术共 <b>{FRACTURE_SURGERIES}</b> 次")
+if ANESTHESIA_TIMES: facts.append(f"麻醉：累计 <b>{ANESTHESIA_TIMES}</b> 次")
 if has_uro: facts.append("急症：<b>2025-01 输尿管梗阻</b>（肌酐冲至峰值 {:.0f}）".format(crea_peak))
 if has_fic: facts.append("泌尿系：反复 <b>FIC</b>（猫特发性膀胱炎）")
 if has_ent: facts.append("消化：<b>2025-05 出血性肠炎</b>")
