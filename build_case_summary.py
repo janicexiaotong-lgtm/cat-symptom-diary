@@ -227,10 +227,11 @@ for _, r in yearly.iterrows():
     yearly_html += f"<tr><td>{int(r['年份'])}</td><td>{int(r['就诊次数'])}</td><td>{cm}</td><td>{cx}</td><td>{wm}</td><td>{iris_stage(r['肌酐均值'])}</td></tr>"
 
 # ---------- 7. 合并为自包含 HTML ----------
-plotly_div = fig.to_html(full_html=False, include_plotlyjs=True, config={"displayModeBar": True})
+plotly_div = fig.to_html(full_html=False, include_plotlyjs=False, config={"displayModeBar": True})
 html = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>猫咪病例可视化汇总 2023-2026</title>
+<script src="plotly-basic.min.js"></script>
 <style>
  body{{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f7f9fc;color:#222;margin:0;}}
  .wrap{{max-width:1320px;margin:0 auto;padding:24px;}}

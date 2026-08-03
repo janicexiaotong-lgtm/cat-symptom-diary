@@ -907,7 +907,7 @@ function selectDay(date){
     if(s.images&&s.images.length){
       imgs='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+s.images.map(src=>{
         const idx=window._dayImgs.push(src)-1;
-        return `<img class="day-img" src="${src}" onclick="event.stopPropagation();openImageLightbox(${idx})" alt="症状图片">`;
+        return `<img class="day-img" src="${src}" onclick="openImageLightbox(${idx});event.stopPropagation();event.preventDefault();return false;" alt="症状图片">`;
       }).join('')+'</div>';
     }
     return `<div class="list-item" onclick="openSymptomModal('${s.id}')"><div class="main"><div class="title-row"><span class="title">${cfg.emoji} ${s.type}</span><span class="tag tag-gray">${s.time}</span></div>${desc?`<div class="desc">${desc}</div>`:''}${imgs}</div></div>`;
