@@ -465,6 +465,21 @@ function saveData(){localStorage.setItem(KEY,JSON.stringify(state));if(window._a
 
 /* ===== 云同步（GitHub Gist） ===== */
 const GIST_API='https://api.github.com/gists';
+const SYNC_SIZE_LIMIT=1020*1024;
+
+/* 构建同步 payload：剔除图片 base64（太大），仅保留文字数据 */
+function buildSyncPayload(){
+  const payload=JSON.parse(JSON.stringify(state));
+  if(payload.symptoms){
+    payload.symptoms=payload.symptoms.map(s=>{
+      const c=Object.assign({},s);
+      if(c.images)c.images=[];
+      return c;
+    });
+  }
+  return JSON.stringify(payload);
+}
+
 function initSync(){
   const code=localStorage.getItem('cat_sync_code');
   const auto=localStorage.getItem('cat_auto_sync')==='1';
@@ -480,7 +495,11 @@ async function syncUpload(){
   localStorage.setItem('cat_gh_token',token);
   status.textContent='⏳ 上传中...';
   try{
-    const data=JSON.stringify(state);
+    const data=buildSyncPayload();
+    if(data.length>SYNC_SIZE_LIMIT){
+      status.innerHTML='<span class="text-danger">✗ 数据量过大（'+(data.length/1024).toFixed(0)+'KB），可能含过多图片。请删除部分带图记录后重试。</span>';
+      return;
+    }
     let code=window._syncCode;
     if(code){
       const resp=await fetch(GIST_API+'/'+code,{method:'PATCH',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},body:JSON.stringify({files:{'cat_data.json':{content:data}}})});
@@ -502,7 +521,8 @@ async function syncUploadSilent(){
   const token=localStorage.getItem('cat_gh_token');
   if(!token)return;
   try{
-    const data=JSON.stringify(state);
+    const data=buildSyncPayload();
+    if(data.length>SYNC_SIZE_LIMIT)return;
     await fetch(GIST_API+'/'+window._syncCode,{method:'PATCH',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},body:JSON.stringify({files:{'cat_data.json':{content:data}}})});
     const s=document.getElementById('syncStatus');if(s)s.innerHTML='<span class="text-success">✓ 自动同步成功（'+new Date().toLocaleTimeString()+'）</span>';
   }catch(e){}
@@ -518,7 +538,19 @@ async function syncDownload(){
     const result=await resp.json();
     const content=result.files&&result.files['cat_data.json']&&result.files['cat_data.json'].content;
     if(!content)throw new Error('数据不存在');
-    const data=JSON.parse(content);
+    /* 检测 Gist 是否截断（单文件超 1MB 时 GitHub 会截断） */
+    if(result.files['cat_data.json'].truncated){
+      throw new Error('云端数据过大被截断，请在上传端删除部分带图记录后重新上传');
+    }
+    /* 尝试解析，截断的 JSON 会在末尾断裂 */
+    let data;
+    try{data=JSON.parse(content);}
+    catch(parseErr){
+      /* 末尾非 }/] 说明 JSON 被截断 */
+      const tail=content.slice(-20);
+      if(!/[}\]]\s*$/.test(tail))throw new Error('云端数据不完整（可能含图片导致超出1MB限制）。请在上传端删除带图记录后重新上传');
+      throw parseErr;
+    }
     if(!data.symptoms)throw new Error('数据格式错误');
     if(confirm('云端数据：'+data.symptoms.length+'条症状、'+(data.medications||[]).length+'条用药、'+(data.weights||[]).length+'条体重\n\n确定覆盖本地数据？')){
       state=Object.assign({cat:state.cat},data);
