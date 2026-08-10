@@ -10,116 +10,158 @@
 <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--primary:#9254de;--primary-light:#f9f0ff;--danger:#ff4d4f;--warning:#faad14;--success:#52c41a;--blue:#1890ff;--purple:#722ed1;--bg:#faf5ff;--card:#fff;--text:#333;--text-2:#666;--text-3:#999;--border:#f0f0f0;--shadow:0 2px 8px rgba(146,84,222,0.08);--radius:12px}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;padding-bottom:64px}
-.header{background:linear-gradient(135deg,#9254de 0%,#722ed1 100%);color:#fff;padding:16px 20px;border-radius:0 0 20px 20px;margin-bottom:12px;box-shadow:0 4px 12px rgba(146,84,222,0.15)}
+:root{
+  --pri:#957DC4;
+  --pri-soft:#B8A8D8;
+  --pri-faint:#F3EEFB;
+  --header-from:#9B8ACF;
+  --header-to:#BCAAE3;
+  --glass-bg:rgba(255,255,255,.65);
+  --glass-border:rgba(160,145,195,.18);
+  --card-solid:#FFFFFF;
+  --case-bg:#EFEBF6;
+  --num-mint:#7EC4AB;
+  --num-lavender:#8E7BB8;
+  --chart-warm:#D4846A;
+  --emphasis:#7A68A8;
+  --text-primary:#3B364A;
+  --text-secondary:#6B6480;
+  --text-muted:#9E96AD;
+  --nav-glass:rgba(248,245,252,.88);
+  --danger:#CF6B70;
+  --success:#7EC4AB;
+  --warning:#D4A85C;
+  --bg-top:#F5F1FA;
+  --bg-bottom:#FCFAFE;
+  --shadow-sm:0 1px 8px rgba(140,120,180,.06),0 1px 3px rgba(0,0,0,.02);
+  --shadow-md:0 4px 20px rgba(140,120,180,.08),0 2px 6px rgba(0,0,0,.03);
+  --radius-lg:20px;
+  --radius-md:16px;
+  --radius-sm:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif;background:linear-gradient(165deg,var(--bg-top) 0%,var(--bg-bottom) 45%,#fff 100%);color:var(--text-primary);font-size:14px;line-height:1.7;padding-bottom:70px;-webkit-font-smoothing:antialiased;min-height:100vh}
+.header{background:linear-gradient(135deg,var(--header-from),var(--header-to));color:#fff;padding:22px 20px 18px;border-radius:0 0 28px 28px;margin-bottom:20px;box-shadow:0 6px 24px rgba(155,138,207,.20)}
 .header-top{display:flex;justify-content:space-between;align-items:center}
-.header h1{font-size:18px;font-weight:600}.header p{font-size:12px;opacity:.85;margin-top:2px}
-.cat-bar{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.header h1{font-size:18px;font-weight:700;letter-spacing:.3px}.header p{font-size:11.5px;opacity:.82;margin-top:3px;font-weight:400}
+.cat-bar{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .cat-bar .cat-name{font-size:16px;font-weight:600}
-.cat-bar .cat-info{font-size:12px;opacity:.9}
-.container{max-width:600px;margin:0 auto;padding:0 12px}
+.cat-bar .cat-info{font-size:12px;opacity:.88}
+.container{max-width:600px;margin:0 auto;padding:0 18px}
 .page{display:none}.page.active{display:block}
-.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
-.card-title{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
-.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
-.stat-box{background:var(--primary-light);border-radius:8px;padding:10px;text-align:center}
-.stat-num{font-size:20px;font-weight:700;line-height:1.2}
-.stat-label{font-size:11px;color:var(--text-3);margin-top:2px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);text-align:center}
-.stat-card .num{font-size:26px;font-weight:700;color:var(--primary)}
-.stat-card .num.danger{color:var(--danger)}.stat-card .num.warning{color:var(--warning)}.stat-card .num.success{color:var(--success)}.stat-card .num.blue{color:var(--blue)}
-.stat-card .label{font-size:12px;color:var(--text-3);margin-top:2px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:8px 16px;border:none;border-radius:8px;font-size:14px;cursor:pointer;background:var(--primary);color:#fff;font-family:inherit;transition:opacity .2s}
-.btn:hover{opacity:.85}.btn-block{width:100%;padding:11px;font-size:15px}
-.btn-outline{background:#fff;color:var(--primary);border:1px solid var(--primary)}
-.btn-danger{background:var(--danger)}.btn-gray{background:#f5f5f5;color:var(--text-2);border:1px solid var(--border)}
-.btn-sm{padding:4px 10px;font-size:12px}
-.tabbar{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid var(--border);z-index:100;max-width:600px;margin:0 auto}
-.tab-item{flex:1;text-align:center;padding:8px 0 6px;cursor:pointer;color:var(--text-3);user-select:none}
-.tab-item.active{color:var(--primary)}
-.tab-item .tab-icon{font-size:20px;display:block;line-height:1}.tab-item .tab-label{font-size:10px;margin-top:2px}
-.list-item{padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.card{background:var(--glass-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:var(--radius-md);padding:20px;margin-bottom:16px;box-shadow:var(--shadow-sm);border:1px solid var(--glass-border)}
+.card-title{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;color:var(--text-primary)}
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px}
+.stat-box{background:var(--card-solid);border-radius:var(--radius-md);padding:18px 14px;text-align:center;box-shadow:var(--shadow-sm);border:1px solid rgba(160,145,195,.10)}
+.stat-num{font-size:28px;font-weight:700;line-height:1.15;letter-spacing:-.5px}
+.stat-label{font-size:11.5px;color:var(--text-muted);margin-top:5px;font-weight:500}
+.stat-card{background:var(--card-solid);border-radius:var(--radius-md);padding:18px;box-shadow:var(--shadow-sm);text-align:center;border:1px solid rgba(160,145,195,.10)}
+.stat-card .num{font-size:28px;font-weight:700;color:var(--pri);letter-spacing:-.5px}
+.stat-card .num.danger{color:var(--danger)}.stat-card .num.warning{color:var(--warning)}.stat-card .num.success{color:var(--success)}.stat-card .num.blue{color:var(--pri)}
+.stat-card .label{font-size:11.5px;color:var(--text-muted);margin-top:4px;font-weight:500}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:9px 18px;border:none;border-radius:12px;font-size:13.5px;cursor:pointer;background:var(--pri);color:#fff;font-family:inherit;font-weight:500;transition:all .2s ease}
+.btn:hover{opacity:.88;transform:scale(.98)}.btn-block{width:100%;padding:13px;font-size:15px}
+.btn-outline{background:var(--card-solid);color:var(--pri);border:1.4px solid var(--pri-soft);font-weight:500}
+.btn-danger{background:var(--danger)}.btn-gray{background:var(--pri-faint);color:var(--text-secondary);border:1px solid transparent}
+.btn-sm{padding:5px 11px;font-size:11.5px;border-radius:10px}
+.tabbar{position:fixed;bottom:0;left:0;right:0;background:var(--nav-glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;border-top:1px solid var(--glass-border);z-index:100;max-width:600px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom)}
+.tab-item{flex:1;text-align:center;padding:9px 0 7px;cursor:pointer;color:var(--text-muted);user-select:none;transition:color .25s ease}
+.tab-item.active{color:var(--pri)}
+.tab-item .tab-icon{font-size:21px;display:block;line-height:1}.tab-item .tab-label{font-size:10px;margin-top:2px;font-weight:500}
+.list-item{padding:14px 0;border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .list-item:last-child{border-bottom:none}
-.list-item .main{flex:1;min-width:0}.list-item .title-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.list-item .title{font-weight:600;font-size:14px}.list-item .date{font-size:12px;color:var(--text-3)}
-.list-item .desc{font-size:13px;color:var(--text-2);margin-top:4px;word-break:break-all}
+.list-item .main{flex:1;min-width:0}.list-item .title-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.list-item .title{font-weight:600;font-size:14px}.list-item .date{font-size:11.5px;color:var(--text-muted)}
+.list-item .desc{font-size:13px;color:var(--text-secondary);margin-top:5px;word-break:break-all;line-height:1.55}
 .list-item .actions{display:flex;gap:6px;flex-shrink:0}
-.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;line-height:1.5}
-.tag-red{background:#fff1f0;color:var(--danger)}.tag-orange{background:#fff7e6;color:#fa8c16}.tag-green{background:#f6ffed;color:var(--success)}.tag-blue{background:#e6f7ff;color:var(--blue)}.tag-gray{background:#fafafa;color:var(--text-2)}.tag-purple{background:#f9f0ff;color:var(--purple)}
+.tag{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;line-height:1.5;font-weight:500}
+.tag-red{background:rgba(207,107,112,.10);color:var(--danger)}.tag-orange{background:rgba(212,168,92,.10);color:var(--warning)}.tag-green{background:rgba(126,196,171,.12);color:var(--success)}.tag-blue{background:var(--pri-faint);color:var(--pri)}.tag-gray{background:rgba(158,150,173,.08);color:var(--text-muted)}.tag-purple{background:rgba(184,168,216,.22);color:var(--pri)}
 .severity-dots{display:inline-flex;gap:2px}.severity-dots .dot{width:8px;height:8px;border-radius:50%;background:#e8e8e8}.severity-dots .dot.on{background:var(--danger)}
-.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;justify-content:center;align-items:flex-end;overflow-y:auto;padding:20px 0}
+.modal-mask{position:fixed;inset:0;background:rgba(59,54,74,.25);z-index:200;display:none;justify-content:center;align-items:end;overflow-y:auto;padding:20px 0}
 .modal-mask.show{display:flex}
-.modal{background:#fff;width:100%;max-width:600px;border-radius:14px 14px 0 0;padding:20px 16px 24px;animation:slideUp .25s ease;max-height:92vh;overflow-y:auto}
+.modal{background:var(--card-solid);width:100%;max-width:600px;border-radius:22px 22px 0 0;padding:24px 20px 32px;animation:slideUp .35s cubic-bezier(.22,1,.36,1);max-height:92vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(140,120,180,.15)}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
-.modal-header h3{font-size:17px}.modal-close{font-size:22px;color:var(--text-3);cursor:pointer;line-height:1;background:none;border:none}
-.form-group{margin-bottom:14px}.form-group label{display:block;font-size:13px;color:var(--text-2);margin-bottom:6px;font-weight:500}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--glass-border)}
+.modal-header h3{font-size:17.5px;font-weight:600}.modal-close{font-size:23px;color:var(--text-muted);cursor:pointer;line-height:1;background:none;border:none}
+.form-group{margin-bottom:16px}.form-group label{display:block;font-size:13px;color:var(--text-secondary);margin-bottom:7px;font-weight:500}
 .form-group label .req{color:var(--danger)}
-.form-control{width:100%;padding:9px 12px;border:1px solid #e8e8e8;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text)}
-.form-control:focus{outline:none;border-color:var(--primary)}
-textarea.form-control{resize:vertical;min-height:60px}
+.form-control{width:100%;padding:11px 14px;border:1.5px solid var(--glass-border);border-radius:12px;font-size:14px;font-family:inherit;background:var(--card-solid);color:var(--text-primary);transition:all .2s ease}
+.form-control:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3.5px rgba(149,125,196,.12)}
+textarea.form-control{resize:vertical;min-height:64px}
 .form-row{display:flex;gap:10px}.form-row .form-group{flex:1}
-.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.type-option{padding:10px 6px;text-align:center;border:1px solid #e8e8e8;border-radius:8px;cursor:pointer;font-size:13px;user-select:none}
-.type-option.selected{border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600}
-.type-option .emoji{display:block;font-size:20px;margin-bottom:2px}
+.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.type-option{padding:11px 6px;text-align:center;border:1.5px solid var(--glass-border);border-radius:12px;cursor:pointer;font-size:13px;user-select:none;background:var(--card-solid);transition:all .2s ease}
+.type-option.selected{border-color:var(--pri);background:var(--pri-faint);color:var(--pri);font-weight:600}
+.type-option .emoji{display:block;font-size:21px;margin-bottom:3px}
 .severity-slider{display:flex;gap:6px}
-.severity-slider .level{flex:1;padding:8px 0;text-align:center;border:1px solid #e8e8e8;border-radius:6px;cursor:pointer;font-size:13px;user-select:none}
+.severity-slider .level{flex:1;padding:9px 0;text-align:center;border:1.5px solid var(--glass-border);border-radius:8px;cursor:pointer;font-size:13px;user-select:none;background:var(--card-solid)}
 .severity-slider .level.on{color:#fff;border-color:transparent;font-weight:600}
-.severity-slider .level.on[data-v="1"]{background:#52c41a}.severity-slider .level.on[data-v="2"]{background:#a0d911}.severity-slider .level.on[data-v="3"]{background:#faad14}.severity-slider .level.on[data-v="4"]{background:#fa8c16}.severity-slider .level.on[data-v="5"]{background:#ff4d4f}
-.img-upload-area{border:1px dashed #e8e8e8;border-radius:8px;padding:16px;text-align:center;color:var(--text-3);cursor:pointer}
+.severity-slider .level.on[data-v="1"]{background:#7EC4AB}.severity-slider .level.on[data-v="2"]{background:#A8CC8E}.severity-slider .level.on[data-v="3"]{background:#D4A85C}.severity-slider .level.on[data-v="4"]{background:#DD9265}.severity-slider .level.on[data-v="5"]{background:var(--danger)}
+.img-upload-area{border:1.5px dashed var(--glass-border);border-radius:12px;padding:18px;text-align:center;color:var(--text-muted);cursor:pointer;background:var(--pri-faint)}
 .img-preview-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.img-preview{position:relative;width:80px;height:80px;border-radius:6px;overflow:hidden}
-.img-preview img{width:100%;height:100%;object-fit:cover}
-.img-preview .remove{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(0,0,0,.5);color:#fff;border-radius:50%;border:none;font-size:12px;cursor:pointer;line-height:18px;padding:0}
-.empty{text-align:center;padding:40px 20px;color:var(--text-3)}.empty .emoji{font-size:48px;margin-bottom:10px}
+.img-preview{position:relative;width:80px;height:80px;border-radius:10px;overflow:hidden}
+.img-preview img{width:100%;height:100%;object-fit-cover}
+.img-preview .remove{position:absolute;top:3px;right:3px;width:18px;height:18px;background:rgba(59,54,74,.45);color:#fff;border-radius:50%;border:none;font-size:11px;cursor:pointer;line-height:18px;padding:0}
+.empty{text-align:center;padding:44px 20px;color:var(--text-muted)}.empty .emoji{font-size:48px;margin-bottom:10px}
 .chart-box{width:100%;overflow-x:auto}.chart-box svg{display:block}
-.metric-selector{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px}
-.metric-chip{padding:5px 12px;border:1px solid #e8e8e8;border-radius:16px;font-size:12px;white-space:nowrap;cursor:pointer;color:var(--text-2);background:#fff;user-select:none}
-.metric-chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 20px;border-radius:6px;z-index:300;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+.metric-selector{display:flex;gap:7px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px}
+.metric-chip{padding:5px 13px;border:1.5px solid var(--glass-border);border-radius:18px;font-size:12px;white-space:nowrap;cursor:pointer;color:var(--text-secondary);background:var(--card-solid);user-select:none;font-weight:400;transition:all .2s}
+.metric-chip.active{background:var(--pri);color:#fff;border-color:var(--pri);font-weight:500}
+.quick-btn{background:var(--pri-faint);border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--glass-border)}
+.quick-btn .emoji{font-size:28px;display:block;margin-bottom:4px}.quick-btn text{font-size:12px;color:var(--text-secondary)}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(59,54,74,.75);color:#fff;padding:11px 22px;border-radius:10px;z-index:300;font-size:13.5px;opacity:0;transition:opacity .3s;pointer-events:none;backdrop-filter:blur(8px)}
 .toast.show{opacity:1}
-.section-title{font-size:13px;color:var(--text-3);margin:14px 0 8px;font-weight:500}
+.section-title{font-size:13px;color:var(--text-muted);margin:16px 0 9px;font-weight:500}
 input[type=file]{display:none}
-.muted{color:var(--text-3);font-size:12px}.text-danger{color:var(--danger)}.text-success{color:var(--success)}
+.muted{color:var(--text-muted);font-size:12px}.text-danger{color:var(--danger)}.text-success{color:var(--success)}
 .quick-grid{display:flex;gap:10px;flex-wrap:wrap}
-.quick-btn{flex:1;min-width:22%;text-align:center;padding:14px 8px;background:var(--primary-light);border-radius:10px;cursor:pointer}
-.quick-btn .emoji{font-size:28px;display:block;margin-bottom:4px}.quick-btn text{font-size:12px;color:#666}
-/* 日历 */
-.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.cal-nav{font-size:24px;color:var(--primary);padding:4px 16px;cursor:pointer}
-.cal-title{font-size:16px;font-weight:600}
-.cal-stats{display:flex;justify-content:space-around;text-align:center;margin-bottom:12px;padding:10px;background:var(--primary-light);border-radius:8px}
-.cal-stat-num{font-size:20px;font-weight:700}.cal-stat-label{font-size:11px;color:#999;margin-top:2px}
+.quick-btn{flex:1;min-width:22%;text-align:center;padding:15px 8px;background:var(--pri-faint);border-radius:var(--radius-sm);cursor:pointer;border:1px solid var(--glass-border)}
+.quick-btn .emoji{font-size:28px;display:block;margin-bottom:4px}.quick-btn text{font-size:12px;color:var(--text-secondary)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav{font-size:24px;color:var(--pri);padding:4px 16px;cursor:pointer}
+.cal-title{font-size:16.5px;font-weight:600}
+.cal-stats{display:flex;justify-content:space-around;text-align:center;margin-bottom:14px;padding:12px;background:var(--pri-faint);border-radius:14px}
+.cal-stat-num{font-size:21px;font-weight:700}.cal-stat-label{font-size:11px;color:var(--text-muted);margin-top:2px}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.cal-week{text-align:center;font-size:11px;color:#999;padding:4px 0}
-.cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;background:#fafafa;font-size:12px;position:relative}
-.cal-cell.today{background:var(--primary-light);border:2px solid var(--primary)}
-.cal-cell.vomit{background:#ff4d4f;color:#fff}
-.cal-cell.cough{background:#faad14;color:#fff}
-.cal-cell.other{background:#9254de;color:#fff}
+.cal-week{text-align:center;font-size:11px;color:var(--text-muted);padding:4px 0}
+.cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;background:var(--pri-faint);font-size:12px;position:relative}
+.cal-cell.today{background:var(--pri-faint);border:2px solid var(--pri-soft)}
+.cal-cell.vomit{background:var(--danger);color:#fff}
+.cal-cell.cough{background:var(--warning);color:#fff}
+.cal-cell.other{background:var(--pri);color:#fff}
 .cal-cell .dot{width:4px;height:4px;border-radius:50%;margin-top:1px}
-.cal-legend{display:flex;gap:12px;justify-content:center;margin-top:10px;font-size:11px;color:#666}
-.cal-legend .sq{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:3px}
-@media(min-width:600px){.stat-grid{grid-template-columns:repeat(4,1fr)}.type-grid{grid-template-columns:repeat(5,1fr)}.modal{border-radius:14px;max-width:560px;margin:20px}.modal-mask{align-items:center;padding:0}@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}}
-.action-row{display:flex;gap:8px;margin-top:16px}.action-row .btn{flex:1}
-/* 曾用药列表 */
-.med-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.cal-legend{display:flex;gap:14px;justify-content:center;margin-top:12px;font-size:11.5px;color:var(--text-secondary)}
+.cal-legend .sq{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px}
+@media(min-width:600px){.stat-grid{grid-template-columns:repeat(4,1fr)}.type-grid{grid-template-columns:repeat(5,1fr)}.modal{border-radius:22px;max-width:560px;margin:24px;box-shadow:0 12px 48px rgba(140,120,180,.14)}.modal-mask{align-items:center;padding:0}@keyframes slideUp{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}}
+.card.case-card{background:var(--case-bg);box-shadow:none;border-color:transparent;backdrop-filter:none}
+.card.case-card .card-title{color:var(--text-primary)}
+.case-summary{font-size:13.5px;line-height:2.05;background:transparent;color:var(--text-primary);border-radius:12px;padding:0}
+.case-summary .cs-cat{font-weight:700;color:var(--text-primary);font-size:15.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.case-summary .cs-stats{display:flex;flex-wrap:wrap;gap:7px 10px;margin-bottom:12px}
+.case-summary .cs-stats span{background:rgba(255,255,255,.6);color:var(--pri);padding:4px 12px;border-radius:14px;font-size:12px;font-weight:500;border:1px solid rgba(149,125,196,.12)}
+.case-summary .cs-list{list-style:none;padding:0;margin:12px 0 0}
+.case-summary .cs-list li{padding:8px 0 8px 20px;position:relative;border-bottom:1px solid rgba(149,125,196,.10);line-height:1.7;color:var(--text-primary)}
+.case-summary .cs-list li:last-child{border-bottom:none}
+.case-summary .cs-list li::before{content:'2';position:absolute;left:0;color:var(--emphasis);font-weight:900;font-size:17px}
+.case-summary .cs-list b{color:var(--emphasis);font-weight:700}
+.case-summary .cs-meta{color:var(--text-secondary);font-size:12px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(149,125,196,.12);line-height:1.5}
+.case-page{padding-bottom:24px}
+.case-nav-btn{display:inline-flex;align-items:center;gap:4px;padding:9px 18px;border-radius:12px;font-size:13px;background:var(--pri-faint);cursor:pointer;text-decoration:none;color:var(--pri);font-weight:500;margin-bottom:16px;transition:all .2s;border:1px solid var(--glass-border)}
+.case-nav-btn:hover{background:var(--pri-soft);opacity:.9}
+.action-row{display:flex;gap:8px;margin-top:18px}.action-row .btn{flex:1}
+.med-item{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--glass-border);cursor:pointer}
 .med-item:last-child{border-bottom:none}
-.med-item-main{flex:1;min-width:0}.med-item-name{font-size:14px;font-weight:500}.med-sub{font-size:12px;color:var(--text-3);margin-top:2px}
-.med-item-arrow{font-size:22px;color:var(--text-3);margin-left:8px}
-/* 打卡 */
-.checkin-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.med-item-main{flex:1;min-width:0}.med-item-name{font-size:14px;font-weight:500}.med-sub{font-size:12px;color:var(--text-muted);margin-top:3px}
+.med-item-arrow{font-size:22px;color:var(--text-muted);margin-left:8px}
+.checkin-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--glass-border)}
 .checkin-row:last-child{border-bottom:none}
 .checkin-info{flex:1;min-width:0;margin-right:10px}.checkin-name{font-size:14px;font-weight:500}
-.checkin-times{margin-top:4px;display:flex;flex-wrap:wrap;gap:6px}
-.checkin-time{display:inline-block;background:var(--success);color:#fff;font-size:11px;padding:1px 8px;border-radius:10px}
-.btn-checkin{background:var(--primary);color:#fff;border:none;white-space:nowrap}
-.time-chip{display:inline-block;padding:4px 10px;border-radius:14px;font-size:12px;margin:2px;cursor:pointer;border:1px solid #e8e8e8}
+.checkin-times{margin-top:5px;display:flex;flex-wrap:wrap;gap:6px}
+.checkin-time{display:inline-block;background:var(--success);color:#fff;font-size:11px;padding:2px 9px;border-radius:10px;font-weight:500}
+.btn-checkin{background:var(--pri);color:#fff;border:none;white-space:nowrap;border-radius:10px;font-weight:500}
+.time-chip{display:inline-block;padding:5px 11px;border-radius:16px;font-size:12px;margin:2px;cursor:pointer;border:1.5px solid var(--glass-border);background:var(--card-solid);transition:all .2s}
 .time-chip.done{background:var(--success);color:#fff;border-color:var(--success);cursor:default}
-.time-chip.upcoming{background:#fff;color:var(--text-2)}
-.time-chip.overdue{background:#fff7e6;color:#fa8c16;border-color:#ffd591}
+.time-chip.upcoming{background:var(--card-solid);color:var(--text-secondary)}
+.time-chip.overdue{background:rgba(212,168,92,.10);color:var(--warning);border-color:rgba(212,168,92,.25)}
 </style>
 </head>
 <body>
@@ -127,7 +169,7 @@ input[type=file]{display:none}
 <div class="header">
   <div class="header-top">
     <div><h1>🐱 猫咪症状日记</h1><p>呕吐频率追踪 · 用药体重 · 趋势可视化</p></div>
-    <button class="btn btn-sm" style="background:rgba(255,255,255,.2)" onclick="openCatModal()">✎ 档案</button>
+    <button class="btn btn-sm" style="background:#E8E2F4;color:#7A68A8" onclick="openCatModal()">✎ 档案</button>
   </div>
   <div class="cat-bar" id="catBar"></div>
 </div>
@@ -136,6 +178,10 @@ input[type=file]{display:none}
   <!-- 总览 -->
   <div class="page active" id="page-dashboard">
     <div class="stat-grid" id="statGrid"></div>
+    <div class="card case-card">
+      <div class="card-title"><span>📋 病例概要速览</span></div>
+      <div id="caseSummary"></div>
+    </div>
     <div class="card">
       <div class="card-title"><span>📊 近6个月呕吐频率</span><button class="btn btn-sm btn-outline" onclick="switchPage('symptoms')">详情</button></div>
       <div class="chart-box" id="dashVomitChart"></div>
@@ -242,7 +288,7 @@ input[type=file]{display:none}
       <div class="cal-legend">
         <span><span class="sq" style="background:#ff4d4f"></span>呕吐</span>
         <span><span class="sq" style="background:#faad14"></span>咳嗽</span>
-        <span><span class="sq" style="background:#9254de"></span>其他</span>
+        <span><span class="sq" style="background:#957DC4"></span>其他</span>
       </div>
     </div>
     <div class="card" id="dayDetailCard" style="display:none">
@@ -293,6 +339,28 @@ input[type=file]{display:none}
       <p class="muted">· iOS Safari：分享→添加到主屏幕。安卓Chrome：菜单→添加到主屏幕。</p>
     </div>
   </div>
+
+  <!-- 病例汇总 -->
+  <div class="page" id="page-case">
+    <div class="case-page">
+      <a class="case-nav-btn" onclick="switchPage('dashboard')">← 返回总览</a>
+      <div class="card">
+        <div class="card-title"><span>🩺 病例概要速览</span></div>
+        <div id="caseSummaryFull"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📊 历年就诊可视化</span></div>
+        <p class="muted" style="margin-bottom:10px">肌酐/尿素氮/血磷/血钙/HCT/离子钙/血钾 + 肾脏超声，含 IRIS 分期色带与临床事件时间线</p>
+        <a class="btn btn-block" href="case-summary.html" target="_blank" style="text-decoration:none">🔬 打开完整病例可视化（新窗口）</a>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📋 关于</span></div>
+        <p class="muted">· 病例汇总由 <code>build_case_summary.py</code> 从病历 Excel 自动生成，包含 Plotly 交互式图表。</p>
+        <p class="muted">· 数据来源：<code>case-data/cat-case-2023-2026.xlsx</code></p>
+        <p class="muted">· 本页仅供长期趋势参考，不替代兽医诊断。</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="tabbar">
@@ -302,6 +370,7 @@ input[type=file]{display:none}
   <div class="tab-item" onclick="switchPage('weight')"><span class="tab-icon">⚖️</span><span class="tab-label">体重</span></div>
   <div class="tab-item" onclick="switchPage('water')"><span class="tab-icon">💧</span><span class="tab-label">饮水</span></div>
   <div class="tab-item" onclick="switchPage('data')"><span class="tab-icon">💾</span><span class="tab-label">数据</span></div>
+  <div class="tab-item" onclick="switchPage('case')"><span class="tab-icon">📋</span><span class="tab-label">病例汇总</span></div>
 </div>
 
 <!-- 猫咪档案弹窗 -->
@@ -522,7 +591,7 @@ function calcAge(b){if(!b)return'';const d=new Date(b),n=new Date();const y=n.ge
 function switchPage(n){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const tabs=['dashboard','symptoms','medications','weight','water','data'];
+  const tabs=['dashboard','symptoms','medications','weight','water','data','case'];
   document.querySelectorAll('.tab-item').forEach((t,i)=>t.classList.toggle('active',tabs[i]===n));
   window.scrollTo(0,0);
   if(n==='dashboard')renderDashboard();
@@ -532,6 +601,7 @@ function switchPage(n){
   if(n==='water')renderWaterPage();
   if(n==='calendar')renderCalendar();
   if(n==='data')renderHeatmap();
+  if(n==='case')renderCasePage();
 }
 
 /* ===== 猫咪档案 ===== */
@@ -877,7 +947,7 @@ function renderWeightPage(){
   // 趋势图只显示近6个月
   const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
   const chartData=sixMonthsData.length?sixMonthsData:sorted;
-  document.getElementById('weightChart').innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#9254de',data:chartData.map(w=>w.value)}]);
+  document.getElementById('weightChart').innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#8E7BB8',data:chartData.map(w=>w.value)}]);
   const list=document.getElementById('weightList');const rev=[...sorted].reverse();
   list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
 }
@@ -933,10 +1003,10 @@ function renderWaterPage(){
   const w=getWeightOnDate(latest.date);
   const lastRetained=latest.intake-latest.output;
   const lastPerKg=w?+(lastRetained/w).toFixed(2):null;
-  grid.innerHTML=`<div class="stat-box"><div class="stat-num" style="color:#1890ff">${latest.intake}</div><div class="stat-label">ml 最近饮水</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#13c2c2">${latest.output}</div><div class="stat-label">ml 最近尿量</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#9254de">${lastRetained}</div><div class="stat-label">ml 最近存水</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#52c41a">${lastPerKg!=null?lastPerKg:'-'}</div><div class="stat-label">每kg存水</div></div>`;
+  grid.innerHTML=`<div class="stat-box"><div class="stat-num" style="color:#7BA8C4">${latest.intake}</div><div class="stat-label">ml 最近饮水</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#7EC4AB">${latest.output}</div><div class="stat-label">ml 最近尿量</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#957DC4">${lastRetained}</div><div class="stat-label">ml 最近存水</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#8DB89A">${lastPerKg!=null?lastPerKg:'-'}</div><div class="stat-label">每kg存水</div></div>`;
   const years=[...new Set(sorted.map(r=>r.date.slice(0,4)))].sort().reverse();
   const cur=window._waterYear&&years.includes(window._waterYear)?window._waterYear:years[0];
   window._waterYear=cur;
@@ -960,7 +1030,7 @@ function drawWaterChart(year){
   const intakeAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.intake,0)/f.length);});
   const outputAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.output,0)/f.length);});
   const storeAvg=months.map((m,i)=>intakeAvg[i]-outputAvg[i]);
-  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#1890ff',data:intakeAvg},{name:'尿量(月日均)',color:'#13c2c2',data:outputAvg},{name:'存水量(月日均)',color:'rgba(146,84,222,0.30)',textColor:'#9254de',type:'bar',data:storeAvg}]);
+  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#7BA8C4',data:intakeAvg},{name:'尿量(月日均)',color:'#7EC4AB',data:outputAvg},{name:'存水量(月日均)',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:storeAvg}]);
 }
 
 /* ===== 日历 ===== */
@@ -1019,23 +1089,47 @@ function renderDashboard(){
   const mv=ms.filter(s=>s.type==='呕吐').length;
   const ws=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
   const curWeight=ws.length?ws[ws.length-1].value:'-';
-  document.getElementById('statGrid').innerHTML=`<div class="stat-card"><div class="num ${mv>=5?'danger':mv>=3?'warning':'success'}">${mv}</div><div class="label">本月呕吐次数</div></div><div class="stat-card"><div class="num" style="color:#9254de">${curWeight}</div><div class="label">当前体重(kg)</div></div>`;
+  document.getElementById('statGrid').innerHTML=`<div class="stat-card"><div class="num" style="color:#7EC4AB">${mv}</div><div class="label">本月呕吐次数</div></div><div class="stat-card"><div class="num" style="color:#8E7BB8">${curWeight}</div><div class="label">当前体重(kg)</div></div>`;
   // 呕吐频率
   const now=new Date();const vlabels=[],vdata=[];
   for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');vlabels.push((d.getMonth()+1)+'月');vdata.push(state.symptoms.filter(s=>s.type==='呕吐'&&s.date&&s.date.slice(0,7)===mk).length);}
-  document.getElementById('dashVomitChart').innerHTML=drawBar(vlabels,vdata,'#ff4d4f');
+  document.getElementById('dashVomitChart').innerHTML=drawBar(vlabels,vdata,'#D4846A');
   // 体重趋势（近6个月）
   const sixMonthsAgo=new Date(now);sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
   const sixMonthsAgoStr=sixMonthsAgo.toISOString().slice(0,10);
   const recentWs=ws.filter(w=>w.date>=sixMonthsAgoStr);
   const chartWs=recentWs.length?recentWs:ws;
-  document.getElementById('dashWeightChart').innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#9254de',data:chartWs.map(w=>w.value)}]):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
+  document.getElementById('dashWeightChart').innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#8E7BB8',data:chartWs.map(w=>w.value)}]):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
   // 最近症状
   const recent=[...state.symptoms].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time)).slice(0,5);
   document.getElementById('recentSymptoms').innerHTML=recent.length?recent.map(s=>{const cfg=SYMPTOM_TYPES.find(t=>t.key===s.type)||{emoji:'📝'};let desc='';if(s.type==='呕吐'&&s.vomitContent)desc=s.vomitContent;else if(s.notes)desc=s.notes;return `<div class="list-item" onclick="openSymptomModal('${s.id}')" style="cursor:pointer"><div class="main"><div class="title-row"><span class="title">${cfg.emoji} ${s.type}</span><span class="tag tag-gray">${s.date}</span></div>${desc?`<div class="desc">${desc}</div>`:''}</div></div>`;}).join(''):'<div class="empty" style="padding:20px"><p>暂无症状记录</p></div>';
   // 用药
   const am=state.medications.filter(m=>!m.endDate||m.endDate>=t);
   if(am.length){document.getElementById('medCard').style.display='block';document.getElementById('recentMeds').innerHTML=am.map(m=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">💊 ${esc(m.name)}</span></div><div class="date">${esc(m.dosage||'')} ${esc(m.frequency||'')}</div></div></div>`).join('');}else document.getElementById('medCard').style.display='none';
+  // 病例概要速览
+  const cat=state.cat||{};
+  let catInfo=cat.name||'未命名';
+  const cp=[];if(cat.breed)cp.push(cat.breed);if(cat.gender)cp.push(cat.gender);
+  if(cat.birthDate){const b=new Date(cat.birthDate);if(!isNaN(b)){const d=new Date();let ay=d.getFullYear()-b.getFullYear(),am2=d.getMonth()-b.getMonth();if(am2<0||(am2===0&&d.getDate()<b.getDate()))ay--;if(ay>=0)cp.push(ay+'岁'+(am2!==0?(am2<0?12+am2:am2)+'个月':''));}}
+  if(cp.length)catInfo+='（'+cp.join('·')+'）';
+  const totals=SYMPTOM_TYPES.map(t=>({...t,n:state.symptoms.filter(s=>s.type===t.key).length})).filter(t=>t.n>0);
+  const totalHtml=totals.length?totals.map(t=>`<span>${t.emoji} ${t.key} ${t.n}</span>`).join(''):'<span class="muted">暂无症状</span>';
+  const lastSym=[...state.symptoms].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const lastDate=lastSym?lastSym.date:(ws.length?ws[ws.length-1].date:'—');
+  document.getElementById('caseSummary').innerHTML=`<div class="cs-cat">🐱 ${esc(catInfo)}</div><ul class="cs-list"><li>主线诊断：<b>慢性肾病 CKD</b>（以 IRIS 3 期为主，最新肌酐 264 μmol/L）</li><li>骨骼：反复桡尺骨骨折手术共 <b>4</b> 次</li><li>麻醉：累计 <b>7</b> 次</li><li>急症：<b>2025-01 输尿管梗阻</b>（肌酐冲至峰值 438）</li><li>泌尿系：反复 <b>FIC</b>（猫特发性膀胱炎）</li><li>消化：<b>2025-05 出血性肠炎</b></li><li>随访：2023-11-03 ~ 2026-06-27，共 <b>41</b> 次就诊、<b>4</b> 个年份</li><li>长期关注：肌酐趋势、慢性呕吐、肾盂扩张</li></ul><div class="cs-meta">当前体重 ${curWeight}kg · 当前用药 ${am.length} 种 · 点击「病例汇总」Tab 查看完整可视化 →</div>`;
+}
+
+/* ===== 病例汇总页 ===== */
+function renderCasePage(){
+  const cat=state.cat||{};
+  let catInfo=cat.name||'未命名';
+  const cp=[];if(cat.breed)cp.push(cat.breed);if(cat.gender)cp.push(cat.gender);
+  if(cat.birthDate){const b=new Date(cat.birthDate);if(!isNaN(b)){const d=new Date();let ay=d.getFullYear()-b.getFullYear(),am2=d.getMonth()-b.getMonth();if(am2<0||(am2===0&&d.getDate()<b.getDate()))ay--;if(ay>=0)cp.push(ay+'岁'+(am2!==0?(am2<0?12+am2:am2)+'个月':''));}}
+  if(cp.length)catInfo+='（'+cp.join('·')+'）';
+  const ws=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
+  const curWeight=ws.length?ws[ws.length-1].value:'-';
+  const am=state.medications.filter(m=>!m.endDate||m.endDate>=today());
+  document.getElementById('caseSummaryFull').innerHTML=`<div class="cs-cat">🐱 ${esc(catInfo)}</div><ul class="cs-list"><li>主线诊断：<b>慢性肾病 CKD</b>（以 IRIS 3 期为主，最新肌酐 264 μmol/L）</li><li>骨骼：反复桡尺骨骨折手术共 <b>4</b> 次</li><li>麻醉：累计 <b>7</b> 次</li><li>急症：<b>2025-01 输尿管梗阻</b>（肌酐冲至峰值 438）</li><li>泌尿系：反复 <b>FIC</b>（猫特发性膀胱炎）</li><li>消化：<b>2025-05 出血性肠炎</b></li><li>随访：2023-11-03 ~ 2026-06-27，共 <b>41</b> 次就诊、<b>4</b> 个年份</li><li>长期关注：肌酐趋势、慢性呕吐、肾盂扩张</li></ul><div class="cs-meta">当前体重 ${curWeight}kg · 当前用药 ${am.length} 种 · 数据来源：猫咪病例数据2023-2026.xlsx</div>`;
 }
 
 /* ===== 图表 ===== */
