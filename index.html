@@ -256,7 +256,9 @@ input[type=file]{display:none}
   <div class="page" id="page-water">
     <div class="card">
       <div class="card-title"><span>💧 饮水 / 尿量记录</span><button class="btn btn-sm" onclick="openWaterModal()">+ 记录</button></div>
-      <p class="muted" style="margin-bottom:10px">记录每日饮水量、尿量、尿次数。存水量 = 饮水 − 尿量；每kg存水量 = 存水量 ÷ 当日/最近体重。</p>
+      <button class="btn btn-block btn-outline" style="margin-bottom:10px" onclick="document.getElementById('importWaterExcel').click()">📥 从Excel导入饮水数据</button>
+      <input type="file" id="importWaterExcel" accept=".xlsx,.xls" onchange="importWaterExcel(this)">
+      <p class="muted" style="margin-bottom:10px">记录每日饮水量、尿量、尿次数。存水量 = 饮水 − 尿量；每kg存水量 = 存水量 ÷ 当日/最近体重。也可点上方按钮直接导入Excel（列：年份 / 日期 / 喝水量 / 尿量 / 次数）。</p>
       <div class="stat-grid" id="waterStatGrid"></div>
     </div>
     <div class="card">
@@ -1001,11 +1003,12 @@ function renderWaterPage(){
   const days=sorted.length;
   const avgWater=Math.round(sorted.reduce((s,r)=>s+r.intake,0)/days);
   const w=getWeightOnDate(latest.date);
-  const lastRetained=latest.intake-latest.output;
-  const lastPerKg=w?+(lastRetained/w).toFixed(2):null;
+  const lastOut=latest.output!=null&&!isNaN(latest.output)?latest.output:null;
+  const lastRetained=lastOut!=null?latest.intake-lastOut:null;
+  const lastPerKg=w&&lastRetained!=null?+(lastRetained/w).toFixed(2):null;
   grid.innerHTML=`<div class="stat-box"><div class="stat-num" style="color:#7BA8C4">${latest.intake}</div><div class="stat-label">ml 最近饮水</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#7EC4AB">${latest.output}</div><div class="stat-label">ml 最近尿量</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#957DC4">${lastRetained}</div><div class="stat-label">ml 最近存水</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#7EC4AB">${lastOut!=null?lastOut:'-'}</div><div class="stat-label">ml 最近尿量</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#957DC4">${lastRetained!=null?lastRetained:'-'}</div><div class="stat-label">ml 最近存水</div></div>
     <div class="stat-box"><div class="stat-num" style="color:#8DB89A">${lastPerKg!=null?lastPerKg:'-'}</div><div class="stat-label">每kg存水</div></div>`;
   const years=[...new Set(sorted.map(r=>r.date.slice(0,4)))].sort().reverse();
   const cur=window._waterYear&&years.includes(window._waterYear)?window._waterYear:years[0];
@@ -1014,11 +1017,12 @@ function renderWaterPage(){
   drawWaterChart(cur);
   const rev=[...sorted].reverse();
   list.innerHTML=rev.map(r=>{
-    const ret=r.intake-r.output;
+    const out=r.output!=null&&!isNaN(r.output)?r.output:null;
+    const ret=out!=null?r.intake-out:null;
     const kg=getWeightOnDate(r.date);
-    const perKg=kg?+(ret/kg).toFixed(2):null;
+    const perKg=kg&&ret!=null?+(ret/kg).toFixed(2):null;
     return `<div class="list-item"><div class="main"><div class="title-row"><span class="title">💧 ${r.date}</span></div>
-      <div class="desc">饮水 <b>${r.intake}</b>ml · 尿量 <b>${r.output}</b>ml · 次数 ${r.count!=null?r.count:'-'}<br>存水量 <b>${ret}</b>ml${perKg!=null?` · 每kg <b>${perKg}</b>ml`:' · 每kg -'}</div></div>
+      <div class="desc">饮水 <b>${r.intake}</b>ml · 尿量 <b>${out!=null?out:'-'}</b>ml · 次数 ${r.count!=null?r.count:'-'}<br>存水量 <b>${ret!=null?ret:'-'}</b>ml${perKg!=null?` · 每kg <b>${perKg}</b>ml`:' · 每kg -'}</div></div>
       <div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWaterRecord('${r.id}')">删除</button></div></div>`;
   }).join('');
 }
@@ -1028,9 +1032,67 @@ function drawWaterChart(year){
   if(!recs.length){box.innerHTML=`<div class="empty" style="padding:20px"><p>${year}年暂无记录</p></div>`;return;}
   const months=[...new Set(recs.map(r=>r.date.slice(5,7)))].sort();
   const intakeAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.intake,0)/f.length);});
-  const outputAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.output,0)/f.length);});
+  const outputAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m&&r.output!=null&&!isNaN(r.output));return f.length?Math.round(f.reduce((s,r)=>s+r.output,0)/f.length):0;});
   const storeAvg=months.map((m,i)=>intakeAvg[i]-outputAvg[i]);
   box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#7BA8C4',data:intakeAvg},{name:'尿量(月日均)',color:'#7EC4AB',data:outputAvg},{name:'存水量(月日均)',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:storeAvg}]);
+}
+
+function importWaterExcel(input){
+  const file=input.files&&input.files[0];
+  if(!file){if(input)input.value='';return;}
+  if(typeof XLSX==='undefined'){toast('Excel库加载中，请稍候重试');if(input)input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,blankrows:false});
+      let headerIdx=-1;
+      for(let i=0;i<rows.length;i++){
+        const r=rows[i]||[];
+        const joined=(r.join(' ')||'').toString();
+        if(joined.indexOf('日期')>=0&&joined.indexOf('喝水量')>=0){headerIdx=i;break;}
+      }
+      if(headerIdx<0){toast('未找到表头(需含 日期/喝水量)');if(input)input.value='';return;}
+      const header=(rows[headerIdx]||[]).map(function(c){return c==null?'':String(c).trim();});
+      const col=function(name){return header.findIndex(function(h){return h.indexOf(name)>=0;});};
+      const yi=col('年份'),di=col('日期'),ii=col('喝水量'),oi=col('尿量'),ci=col('次数');
+      if(di<0||ii<0){toast('缺少 日期/喝水量 列');if(input)input.value='';return;}
+      let added=0,updated=0;
+      const map={};
+      state.waterRecords.forEach(function(r){map[r.date]=r;});
+      for(let i=headerIdx+1;i<rows.length;i++){
+        const r=rows[i]||[];
+        if(!r.length)continue;
+        let year=(r[yi]!=null?String(r[yi]).trim():'');
+        const d=(r[di]!=null?String(r[di]):'').trim();
+        if(!d)continue;
+        let mm,dd,yy=null;
+        if(r[di] instanceof Date){yy=r[di].getFullYear();mm=r[di].getMonth()+1;dd=r[di].getDate();}
+        else{
+          const dm=d.split('/');
+          if(dm.length>=3){yy=parseInt(dm[0]);mm=parseInt(dm[1]);dd=parseInt(dm[2]);}
+          else if(dm.length>=2){mm=parseInt(dm[0]);dd=parseInt(dm[1]);}
+        }
+        if(year)yy=parseInt(year);
+        if(isNaN(mm)||isNaN(dd))continue;
+        if(!yy||isNaN(yy))yy=new Date().getFullYear();
+        const date=yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+        const intake=parseFloat(r[ii]!=null?String(r[ii]):'');
+        if(isNaN(intake))continue;
+        const outRaw=r[oi];
+        const output=(outRaw!=null&&outRaw!==''&&!isNaN(parseFloat(outRaw)))?parseFloat(outRaw):null;
+        const cntRaw=r[ci];
+        const count=(cntRaw!=null&&cntRaw!==''&&!isNaN(parseInt(cntRaw)))?parseInt(cntRaw):null;
+        if(map[date]){map[date].intake=intake;map[date].output=output;map[date].count=count;updated++;}
+        else{const rec={id:uid(),date:date,intake:intake,output:output,count:count};state.waterRecords.push(rec);map[date]=rec;added++;}
+      }
+      saveData();renderWaterPage();renderDashboard();
+      toast('已导入 '+added+' 条 / 更新 '+updated+' 条');
+    }catch(err){toast('导入失败：'+(err&&err.message?err.message:err));}
+    if(input)input.value='';
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 /* ===== 日历 ===== */
