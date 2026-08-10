@@ -959,7 +959,8 @@ function drawWaterChart(year){
   const months=[...new Set(recs.map(r=>r.date.slice(5,7)))].sort();
   const intakeAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.intake,0)/f.length);});
   const outputAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.output,0)/f.length);});
-  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#1890ff',data:intakeAvg},{name:'尿量(月日均)',color:'#13c2c2',data:outputAvg}]);
+  const storeAvg=months.map((m,i)=>intakeAvg[i]-outputAvg[i]);
+  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#1890ff',data:intakeAvg},{name:'尿量(月日均)',color:'#13c2c2',data:outputAvg},{name:'存水量(月日均)',color:'rgba(146,84,222,0.30)',textColor:'#9254de',type:'bar',data:storeAvg}]);
 }
 
 /* ===== 日历 ===== */
@@ -1059,8 +1060,17 @@ function drawLine(labels,series){
   let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
   for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yR/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v.toFixed(1)}</text>`;}
   const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
-  series.forEach(s=>{svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i)+','+yS2(v):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;s.data.forEach((v,i)=>{if(v!=null)svg+=`<circle cx="${xS2(i)}" cy="${yS2(v)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;});});
-  let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="8" width="12" height="3" fill="${s.color}" rx="1"/><text x="${lx+16}" y="13" font-size="10" fill="#666">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
+  const bw=Math.min(22,(xS||cw/labels.length)*0.5);
+  series.forEach(s=>{
+    if(s.type==='bar'){
+      const baseY=yS2(0);
+      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';if(hgt>0.5)svg+=`<rect x="${cx-bw/2}" y="${top}" width="${bw}" height="${hgt}" fill="${col}" rx="2"/>`;svg+=`<text x="${cx}" y="${v>=0?yv-4:yv+11}" text-anchor="middle" font-size="9" fill="${s.textColor||(v>=0?'#9254de':'#ff4d4f')}">${v}</text>`;});
+    }else{
+      svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i)+','+yS2(v):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
+      s.data.forEach((v,i)=>{if(v!=null)svg+=`<circle cx="${xS2(i)}" cy="${yS2(v)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;});
+    }
+  });
+  let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="8" width="12" height="3" fill="${s.textColor||s.color}" rx="1"/><text x="${lx+16}" y="13" font-size="10" fill="#666">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
   svg+='</svg>';return svg;
 }
 
