@@ -946,11 +946,11 @@ function renderWeightPage(){
   }
 
   summary.innerHTML=`<div style="display:flex;justify-content:space-around;text-align:center;margin:10px 0;flex-wrap:wrap;gap:10px"><div><div style="font-size:28px;font-weight:700;color:#9254de">${latest.value}</div><div class="muted">kg 最新</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${changeStr}</div><div class="muted">kg 较6个月前</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${pctStr}</div><div class="muted">变化率</div></div><div><div style="font-size:28px;font-weight:700;color:#722ed1">${baseline}</div><div class="muted">kg 3月均值</div></div></div>`;
-  // 趋势图只显示近6个月
-  const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
-  const chartData=sixMonthsData.length?sixMonthsData:sorted;
+  // 趋势图显示全部历史数据（历年）
+  const chartData=sorted;
+  const wLabels=chartData.map((w,i)=>{const yr=w.date.slice(0,4);const prev=i>0?chartData[i-1].date.slice(0,4):null;return (i===0||yr!==prev)?w.date.slice(0,7):w.date.slice(5);});
   const wc=document.getElementById('weightChart');
-  wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
+  wc.innerHTML=drawLine(wLabels,[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
   bindChartTips(wc);
   const list=document.getElementById('weightList');const rev=[...sorted].reverse();
   list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
