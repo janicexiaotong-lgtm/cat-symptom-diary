@@ -949,7 +949,9 @@ function renderWeightPage(){
   // 趋势图只显示近6个月
   const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
   const chartData=sixMonthsData.length?sixMonthsData:sorted;
-  document.getElementById('weightChart').innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#8E7BB8',data:chartData.map(w=>w.value)}]);
+  const wc=document.getElementById('weightChart');
+  wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2,yMax:4,yTicks:weightTicks()});
+  bindChartTips(wc);
   const list=document.getElementById('weightList');const rev=[...sorted].reverse();
   list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
 }
@@ -1034,7 +1036,8 @@ function drawWaterChart(year){
   const intakeAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.intake,0)/f.length);});
   const outputAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m&&r.output!=null&&!isNaN(r.output));return f.length?Math.round(f.reduce((s,r)=>s+r.output,0)/f.length):0;});
   const storeAvg=months.map((m,i)=>intakeAvg[i]-outputAvg[i]);
-  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#7BA8C4',data:intakeAvg},{name:'尿量(月日均)',color:'#7EC4AB',data:outputAvg},{name:'存水量(月日均)',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:storeAvg}]);
+  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#7BA8C4',data:intakeAvg,unit:'ml'},{name:'尿量(月日均)',color:'#7EC4AB',data:outputAvg,unit:'ml'},{name:'存水量(月日均)',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:storeAvg,unit:'ml'}]);
+  bindChartTips(box);
 }
 
 function importWaterExcel(input){
@@ -1161,7 +1164,9 @@ function renderDashboard(){
   const sixMonthsAgoStr=sixMonthsAgo.toISOString().slice(0,10);
   const recentWs=ws.filter(w=>w.date>=sixMonthsAgoStr);
   const chartWs=recentWs.length?recentWs:ws;
-  document.getElementById('dashWeightChart').innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重kg',color:'#8E7BB8',data:chartWs.map(w=>w.value)}]):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
+  const dwc=document.getElementById('dashWeightChart');
+  dwc.innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartWs.map(w=>w.value),unit:'kg'}],{yMin:2,yMax:4,yTicks:weightTicks()}):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
+  if(chartWs.length)bindChartTips(dwc);
   // 最近症状
   const recent=[...state.symptoms].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time)).slice(0,5);
   document.getElementById('recentSymptoms').innerHTML=recent.length?recent.map(s=>{const cfg=SYMPTOM_TYPES.find(t=>t.key===s.type)||{emoji:'📝'};let desc='';if(s.type==='呕吐'&&s.vomitContent)desc=s.vomitContent;else if(s.notes)desc=s.notes;return `<div class="list-item" onclick="openSymptomModal('${s.id}')" style="cursor:pointer"><div class="main"><div class="title-row"><span class="title">${cfg.emoji} ${s.type}</span><span class="tag tag-gray">${s.date}</span></div>${desc?`<div class="desc">${desc}</div>`:''}</div></div>`;}).join(''):'<div class="empty" style="padding:20px"><p>暂无症状记录</p></div>';
@@ -1206,28 +1211,67 @@ function drawBar(labels,data,color){
   const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${pad.l+i*slot+slot/2}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
   svg+='</svg>';return svg;
 }
-function drawLine(labels,series){
+function drawLine(labels,series,opts){
+  opts=opts||{};
   if(!labels.length||!series.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
   const w=Math.max(320,labels.length*36),h=200;const pad={t:28,r:16,b:36,l:42};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
-  let yMax=-Infinity,yMin=Infinity;series.forEach(s=>s.data.forEach(v=>{if(v!=null){if(v>yMax)yMax=v;if(v<yMin)yMin=v;}}));
-  if(!isFinite(yMax)){yMax=1;yMin=0;}if(yMin>0)yMin=0;yMax=yMax*1.15;
+  let yMax,yMin,yTicks;
+  if(opts.yMin!=null&&opts.yMax!=null){yMin=opts.yMin;yMax=opts.yMax;yTicks=opts.yTicks&&opts.yTicks.length?opts.yTicks.slice():[yMin,(yMin+yMax)/2,yMax];}
+  else{
+    yMax=-Infinity;yMin=Infinity;series.forEach(s=>s.data.forEach(v=>{if(v!=null){if(v>yMax)yMax=v;if(v<yMin)yMin=v;}}));
+    if(!isFinite(yMax)){yMax=1;yMin=0;}
+    if(yMin>0)yMin=0;
+    yMax=yMax*1.15;
+    yTicks=null;
+  }
   const yR=yMax-yMin||1;const xS=labels.length>1?cw/(labels.length-1):0;
   const xS2=i=>pad.l+i*xS;const yS2=v=>pad.t+ch-((v-yMin)/yR)*ch;
   let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
-  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yR/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v.toFixed(1)}</text>`;}
+  if(yTicks){
+    yTicks.forEach(t=>{if(t<yMin-1e-9||t>yMax+1e-9)return;const y=yS2(t);svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${t.toFixed(1)}</text>`;});
+  }else{
+    for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yR/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v.toFixed(1)}</text>`;}
+  }
   const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
   const bw=Math.min(22,(xS||cw/labels.length)*0.5);
   series.forEach(s=>{
+    const unit=s.unit||'';const tipName=esc(s.name);
     if(s.type==='bar'){
       const baseY=yS2(0);
-      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';if(hgt>0.5)svg+=`<rect x="${cx-bw/2}" y="${top}" width="${bw}" height="${hgt}" fill="${col}" rx="2"/>`;svg+=`<text x="${cx}" y="${v>=0?yv-4:yv+11}" text-anchor="middle" font-size="9" fill="${s.textColor||(v>=0?'#9254de':'#ff4d4f')}">${v}</text>`;});
+      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';const tip=tipName+': '+v+unit;if(hgt>0.5)svg+=`<rect x="${cx-bw/2}" y="${top}" width="${bw}" height="${hgt}" fill="${col}" rx="2" data-tip="${tip}"/>`;svg+=`<text x="${cx}" y="${v>=0?yv-4:yv+11}" text-anchor="middle" font-size="9" fill="${s.textColor||(v>=0?'#9254de':'#ff4d4f')}">${v}</text>`;});
     }else{
       svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i)+','+yS2(v):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
-      s.data.forEach((v,i)=>{if(v!=null)svg+=`<circle cx="${xS2(i)}" cy="${yS2(v)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2"/>`;});
+      s.data.forEach((v,i)=>{if(v!=null){const tip=tipName+': '+v+unit;svg+=`<circle cx="${xS2(i)}" cy="${yS2(v)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2" data-tip="${tip}"/>`;}});
     }
   });
   let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="8" width="12" height="3" fill="${s.textColor||s.color}" rx="1"/><text x="${lx+16}" y="13" font-size="10" fill="#666">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
   svg+='</svg>';return svg;
+}
+function weightTicks(){
+  const t=[];
+  const seg=(a,b,n)=>{for(let i=0;i<=n;i++)t.push(+(a+(b-a)/n*i).toFixed(3));};
+  seg(2,3.2,3);
+  for(let v=3.2;v<=3.7001;v+=0.1)t.push(+v.toFixed(3));
+  seg(3.7,4,2);
+  return [...new Set(t.map(x=>+x.toFixed(2)))];
+}
+function showChartTip(evt,text){
+  let tip=document.getElementById('chartTip');
+  if(!tip){tip=document.createElement('div');tip.id='chartTip';document.body.appendChild(tip);}
+  tip.textContent=text;
+  tip.style.cssText='position:fixed;z-index:600;background:rgba(59,54,74,.92);color:#fff;padding:6px 11px;border-radius:9px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,.22);transition:opacity .15s';
+  const x=(evt&&evt.clientX!=null)?evt.clientX:(window.innerWidth/2);const y=(evt&&evt.clientY!=null)?evt.clientY:(window.innerHeight/2);
+  tip.style.left=(x+12)+'px';tip.style.top=(y+12)+'px';tip.style.opacity='1';tip.style.display='block';
+  clearTimeout(tip._t);tip._t=setTimeout(()=>{tip.style.opacity='0';tip.style.display='none';},2600);
+}
+function bindChartTips(box){
+  if(!box)return;
+  box.querySelectorAll('[data-tip]').forEach(el=>{
+    const text=el.getAttribute('data-tip');
+    el.style.cursor='pointer';
+    el.addEventListener('click',e=>showChartTip(e,text));
+    el.addEventListener('touchstart',e=>showChartTip(e,text),{passive:true});
+  });
 }
 
 /* ===== 数据管理 ===== */
