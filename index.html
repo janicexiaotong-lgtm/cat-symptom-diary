@@ -950,7 +950,7 @@ function renderWeightPage(){
   const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
   const chartData=sixMonthsData.length?sixMonthsData:sorted;
   const wc=document.getElementById('weightChart');
-  wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2,yMax:4,yTicks:weightTicks()});
+  wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
   bindChartTips(wc);
   const list=document.getElementById('weightList');const rev=[...sorted].reverse();
   list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
@@ -1165,7 +1165,7 @@ function renderDashboard(){
   const recentWs=ws.filter(w=>w.date>=sixMonthsAgoStr);
   const chartWs=recentWs.length?recentWs:ws;
   const dwc=document.getElementById('dashWeightChart');
-  dwc.innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartWs.map(w=>w.value),unit:'kg'}],{yMin:2,yMax:4,yTicks:weightTicks()}):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
+  dwc.innerHTML=chartWs.length?drawLine(chartWs.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartWs.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()}):'<div class="empty" style="padding:20px"><p>暂无体重</p></div>';
   if(chartWs.length)bindChartTips(dwc);
   // 最近症状
   const recent=[...state.symptoms].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time)).slice(0,5);
@@ -1248,12 +1248,7 @@ function drawLine(labels,series,opts){
   svg+='</svg>';return svg;
 }
 function weightTicks(){
-  const t=[];
-  const seg=(a,b,n)=>{for(let i=0;i<=n;i++)t.push(+(a+(b-a)/n*i).toFixed(3));};
-  seg(2,3.2,3);
-  for(let v=3.2;v<=3.7001;v+=0.1)t.push(+v.toFixed(3));
-  seg(3.7,4,2);
-  return [...new Set(t.map(x=>+x.toFixed(2)))];
+  const t=[];for(let v=2.4;v<=3.8001;v+=0.2)t.push(+v.toFixed(2));return t;
 }
 function showChartTip(evt,text){
   let tip=document.getElementById('chartTip');
