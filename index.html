@@ -162,6 +162,30 @@ input[type=file]{display:none}
 .time-chip.done{background:var(--success);color:#fff;border-color:var(--success);cursor:default}
 .time-chip.upcoming{background:var(--card-solid);color:var(--text-secondary)}
 .time-chip.overdue{background:rgba(212,168,92,.10);color:var(--warning);border-color:rgba(212,168,92,.25)}
+/* 病例检验模块 */
+.lab-chip-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:6px;scrollbar-width:thin}
+.lab-chip{flex-shrink:0;padding:5px 11px;border-radius:14px;font-size:11.5px;cursor:pointer;border:1.5px solid var(--glass-border);background:var(--card-solid);color:var(--text-secondary);white-space:nowrap;transition:all .18s;user-select:none}
+.lab-chip.active{background:var(--pri);color:#fff;border-color:var(--pri);font-weight:500}
+.lab-chip.yr{background:var(--pri-faint);color:var(--pri);border-color:transparent;cursor:default;font-weight:600}
+.lab-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}
+.lab-item{background:var(--card-solid);border:1px solid rgba(160,145,195,.12);border-radius:14px;padding:13px 12px}
+.lab-item .lab-name{font-size:12px;color:var(--text-muted);font-weight:500}
+.lab-item .lab-val{font-size:20px;font-weight:700;margin-top:3px;letter-spacing:-.3px}
+.lab-item .lab-val.ok{color:var(--success)}
+.lab-item .lab-val.bad{color:var(--danger)}
+.lab-item .lab-val.na{color:var(--text-muted);font-size:15px}
+.lab-item .lab-ref{font-size:10.5px;color:var(--text-muted);margin-top:4px}
+.lab-item .lab-note{font-size:10.5px;color:var(--warning);margin-top:3px}
+@media(min-width:600px){.lab-grid{grid-template-columns:repeat(4,1fr)}}
+/* 平滑曲线图：固定Y轴+横向滚动 */
+.sm-wrap{width:100%}
+.sm-legend{display:flex;gap:16px;font-size:11px;color:var(--text-secondary);margin-bottom:4px;flex-wrap:wrap}
+.sm-legend i{display:inline-block;width:12px;height:3.5px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.sm-body{display:flex;align-items:flex-start}
+.sm-axis{flex:0 0 42px}
+.sm-axis svg{display:block}
+.sm-scroll{flex:1 1 auto;overflow-x:auto;min-width:0;scrollbar-width:thin}
+.sm-scroll svg{display:block}
 </style>
 </head>
 <body>
@@ -349,6 +373,17 @@ input[type=file]{display:none}
       <div class="card">
         <div class="card-title"><span>🩺 病例概要速览</span></div>
         <div id="caseSummaryFull"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📈 肌酐 / 尿素氮趋势</span></div>
+        <p class="muted" style="margin-bottom:10px">平滑曲线 · 点击曲线上的圆点查看具体数值（2023-11 ~ 2026-08，共 35 次血检）</p>
+        <div class="chart-box" id="caseLabTrend"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>🔬 指标详情</span><span class="muted" id="labDateLabel"></span></div>
+        <p class="muted" style="margin-bottom:8px">选择检查日期，查看当日 7 项关键指标</p>
+        <div class="lab-chip-bar" id="labDateChips"></div>
+        <div id="labDetail"></div>
       </div>
       <div class="card">
         <div class="card-title"><span>📊 历年就诊可视化</span></div>
@@ -946,11 +981,11 @@ function renderWeightPage(){
   }
 
   summary.innerHTML=`<div style="display:flex;justify-content:space-around;text-align:center;margin:10px 0;flex-wrap:wrap;gap:10px"><div><div style="font-size:28px;font-weight:700;color:#9254de">${latest.value}</div><div class="muted">kg 最新</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${changeStr}</div><div class="muted">kg 较6个月前</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${pctStr}</div><div class="muted">变化率</div></div><div><div style="font-size:28px;font-weight:700;color:#722ed1">${baseline}</div><div class="muted">kg 3月均值</div></div></div>`;
-  // 趋势图显示全部历史数据（历年）
-  const chartData=sorted;
-  const wLabels=chartData.map((w,i)=>{const yr=w.date.slice(0,4);const prev=i>0?chartData[i-1].date.slice(0,4):null;return (i===0||yr!==prev)?w.date.slice(0,7):w.date.slice(5);});
+  // 趋势图只显示近6个月
+  const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
+  const chartData=sixMonthsData.length?sixMonthsData:sorted;
   const wc=document.getElementById('weightChart');
-  wc.innerHTML=drawLine(wLabels,[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
+  wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
   bindChartTips(wc);
   const list=document.getElementById('weightList');const rev=[...sorted].reverse();
   list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
@@ -1187,6 +1222,108 @@ function renderDashboard(){
 }
 
 /* ===== 病例汇总页 ===== */
+/* ===== 病例检验数据（源自 猫病例数据2023-2026.xlsx，固定快照；更新需重新生成）===== */
+const CASE_LABS=[{"date":"2023-11-03","crea":219.7,"bun":32.49,"phos":null,"hct":0.365,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2023-11-06","crea":427,"bun":90.54,"phos":null,"hct":0.302,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2023-11-09","crea":114,"bun":20.18,"phos":1.25,"hct":0.377,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-02-06","crea":174,"bun":56.06,"phos":null,"hct":0.415,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-03-24","crea":188,"bun":66.72,"phos":null,"hct":0.393,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-07-23","crea":213,"bun":45,"phos":1.33,"hct":null,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-07-26","crea":145,"bun":24.95,"phos":null,"hct":null,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-08-27","crea":203.32,"bun":53,"phos":1.74,"hct":0.438,"ica":null,"bp":138,"bpNote":null,"sg":1.019},{"date":"2024-09-13","crea":256.1,"bun":47.04,"phos":1.4,"hct":null,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-09-24","crea":247,"bun":42.89,"phos":1.32,"hct":0.398,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-09-30","crea":247.6,"bun":25.71,"phos":1.32,"hct":0.324,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-11-09","crea":225.9,"bun":62.4,"phos":1.36,"hct":0.41,"ica":1.32,"bp":null,"bpNote":null,"sg":null},{"date":"2024-12-07","crea":221,"bun":67,"phos":1.45,"hct":null,"ica":1.26,"bp":null,"bpNote":null,"sg":null},{"date":"2024-12-13","crea":251.06,"bun":56.8,"phos":1.61,"hct":0.414,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2024-12-21","crea":247.52,"bun":62,"phos":1.32,"hct":null,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2025-01-12","crea":437.8,"bun":75.38,"phos":1.65,"hct":0.421,"ica":1.29,"bp":null,"bpNote":null,"sg":null},{"date":"2025-01-16","crea":371.28,"bun":64,"phos":1.45,"hct":0.397,"ica":1.36,"bp":null,"bpNote":null,"sg":1.018},{"date":"2025-01-22","crea":309.4,"bun":59,"phos":1.39,"hct":0.28,"ica":1.35,"bp":null,"bpNote":null,"sg":null},{"date":"2025-02-01","crea":300.56,"bun":56,"phos":1.49,"hct":0.304,"ica":1.28,"bp":null,"bpNote":null,"sg":null},{"date":"2025-02-15","crea":265.2,"bun":68,"phos":1.42,"hct":0.26,"ica":1.32,"bp":null,"bpNote":null,"sg":null},{"date":"2025-03-01","crea":291.72,"bun":69,"phos":1.58,"hct":0.257,"ica":1.33,"bp":null,"bpNote":null,"sg":null},{"date":"2025-03-15","crea":291.72,"bun":72,"phos":1.39,"hct":0.313,"ica":1.29,"bp":null,"bpNote":null,"sg":null},{"date":"2025-04-04","crea":256.36,"bun":55,"phos":null,"hct":0.294,"ica":1.32,"bp":null,"bpNote":null,"sg":null},{"date":"2025-05-03","crea":309.4,"bun":60,"phos":1.45,"hct":0.291,"ica":1.21,"bp":null,"bpNote":null,"sg":null},{"date":"2025-05-10","crea":308,"bun":33.92,"phos":null,"hct":0.216,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2025-06-01","crea":302,"bun":65.32,"phos":1.43,"hct":0.392,"ica":null,"bp":null,"bpNote":null,"sg":1.016},{"date":"2025-07-12","crea":282.88,"bun":64,"phos":1.49,"hct":0.42,"ica":1.31,"bp":null,"bpNote":null,"sg":null},{"date":"2025-09-06","crea":382,"bun":63.35,"phos":1.4,"hct":0.319,"ica":1.32,"bp":null,"bpNote":null,"sg":1.02},{"date":"2025-11-29","crea":293,"bun":57.47,"phos":1.44,"hct":0.238,"ica":null,"bp":null,"bpNote":null,"sg":null},{"date":"2026-01-24","crea":274.04,"bun":69,"phos":1.49,"hct":0.436,"ica":1.35,"bp":null,"bpNote":null,"sg":null},{"date":"2026-03-28","crea":256.36,"bun":60,"phos":1.49,"hct":0.437,"ica":1.33,"bp":120,"bpNote":null,"sg":1.016},{"date":"2026-05-16","crea":291,"bun":66.72,"phos":1.6,"hct":0.409,"ica":1.36,"bp":null,"bpNote":null,"sg":null},{"date":"2026-06-04","crea":264,"bun":70.92,"phos":1.42,"hct":0.401,"ica":1.32,"bp":null,"bpNote":null,"sg":null},{"date":"2026-08-09","crea":274,"bun":59,"phos":1.39,"hct":0.397,"ica":1.22,"bp":null,"bpNote":null,"sg":1.015},{"date":"2026-08-23","crea":292,"bun":57,"phos":1.23,"hct":0.407,"ica":1.31,"bp":160,"bpNote":"160(回家测130)","sg":1.015}];
+
+/* ===== 病例检验：参考范围与渲染 ===== */
+const LAB_REFS={
+  crea:{name:'肌酐',unit:'μmol/L',ref:'71~212',ok:v=>v>=71&&v<=212},
+  bun:{name:'尿素氮',unit:'mg/dL',ref:'16~36',ok:v=>v>=16&&v<=36},
+  phos:{name:'血磷',unit:'mmol/L',ref:'1.00~2.42',ok:v=>v>=1&&v<=2.42},
+  ica:{name:'离子钙',unit:'mmol/L',ref:'1.15~1.35',ok:v=>v>=1.15&&v<=1.35},
+  bp:{name:'血压',unit:'mmHg',ref:'<140',ok:v=>v<140},
+  sg:{name:'尿比重',unit:'',ref:'≥1.035',ok:v=>v>=1.035},
+  hct:{name:'HCT',unit:'%',ref:'30.3~52.3',ok:v=>v*100>=30.3&&v*100<=52.3,fm:v=>+(v*100).toFixed(1)}
+};
+function irisStage(crea){if(crea==null)return null;if(crea<140)return 'IRIS 1期';if(crea<=250)return 'IRIS 2期';if(crea<=440)return 'IRIS 3期';return 'IRIS 4期';}
+function drawSmooth(labels,series,dates){
+  if(!labels.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
+  const w=Math.max(320,labels.length*26),h=230;const pad={t:26,r:14,b:36,l:42};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  let yMax=-Infinity;series.forEach(s=>s.data.forEach(v=>{if(v!=null&&v>yMax)yMax=v;}));
+  if(!isFinite(yMax))yMax=100;
+  yMax=Math.ceil(yMax*1.08/50)*50;
+  const xS=labels.length>1?cw/(labels.length-1):0;
+  const xS2=i=>pad.l+i*xS;const yS2=v=>pad.t+ch-(v/yMax)*ch;
+  // 固定 Y 轴（不随横向滚动）
+  let ax=`<svg viewBox="0 0 ${pad.l} ${h}" width="${pad.l}" height="${h}">`;
+  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yMax/5)*i;ax+=`<text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${Math.round(v)}</text>`;}
+  ax+='</svg>';
+  // 主体（viewBox 从 pad.l 起，左侧 Y 轴区被裁掉，网格横线仍绘制）
+  let svg=`<svg viewBox="${pad.l} 0 ${w-pad.l} ${h}" width="${w-pad.l}" height="${h}">`;
+  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/>`;}
+  const step=Math.ceil(labels.length/9);
+  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i)}" y="${h-pad.b+15}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
+  series.forEach(s=>{
+    const segs=[];let cur=[];
+    s.data.forEach((v,i)=>{if(v!=null)cur.push(i);else if(cur.length){segs.push(cur);cur=[];}});
+    if(cur.length)segs.push(cur);
+    segs.forEach(idxs=>{
+      const pts=idxs.map(i=>[xS2(i),yS2(s.data[i])]);
+      if(pts.length<2)return;
+      let d=`M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+      for(let i=0;i<pts.length-1;i++){
+        const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
+        const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
+        const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+        d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+      }
+      svg+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    });
+    s.data.forEach((v,i)=>{
+      if(v==null)return;
+      const dt=dates?dates[i]:labels[i];
+      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.4" fill="#fff" stroke="${s.color}" stroke-width="2" style="cursor:pointer" data-tip="${s.name}：${v} · ${dt}"/>`;
+    });
+  });
+  svg+='</svg>';
+  let legend='<div class="sm-legend">';series.forEach(s=>{legend+=`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`;});legend+='</div>';
+  return `<div class="sm-wrap">${legend}<div class="sm-body"><div class="sm-axis">${ax}</div><div class="sm-scroll">${svg}</div></div></div>`;
+}
+function renderLabTrend(){
+  const recs=CASE_LABS.filter(r=>r.crea!=null||r.bun!=null);
+  const box=document.getElementById('caseLabTrend');
+  if(!recs.length){box.innerHTML='<div class="empty" style="padding:20px"><p>暂无血检数据</p></div>';return;}
+  box.innerHTML=drawSmooth(recs.map(r=>r.date.slice(2)),[
+    {name:'肌酐(μmol/L)',color:'#D4846A',data:recs.map(r=>r.crea)},
+    {name:'尿素氮(mg/dL)',color:'#7EC4AB',data:recs.map(r=>r.bun)}
+  ],recs.map(r=>r.date));
+  bindChartTips(box);
+}
+let labSelDate=null;
+function renderLabChips(){
+  const bar=document.getElementById('labDateChips');
+  let html='';let lastYr='';
+  CASE_LABS.forEach(r=>{
+    const yr=r.date.slice(0,4);
+    if(yr!==lastYr){html+=`<span class="lab-chip yr">${yr}年</span>`;lastYr=yr;}
+    html+=`<span class="lab-chip${r.date===labSelDate?' active':''}" onclick="selLabDate('${r.date}')">${r.date.slice(5)}</span>`;
+  });
+  bar.innerHTML=html;
+  const act=bar.querySelector('.lab-chip.active');
+  if(act&&act.scrollIntoView)act.scrollIntoView({inline:'center',block:'nearest'});
+}
+function selLabDate(date){labSelDate=date;renderLabChips();renderLabDetail();}
+function renderLabDetail(){
+  const box=document.getElementById('labDetail');
+  const label=document.getElementById('labDateLabel');
+  const r=CASE_LABS.find(x=>x.date===labSelDate);
+  label.textContent=r?('检查日期 '+r.date):'';
+  if(!r){box.innerHTML='';return;}
+  const items=['crea','bun','phos','ica','bp','sg','hct'].map(k=>{
+    const ref=LAB_REFS[k];const v=r[k];
+    let valHtml;
+    if(v==null)valHtml='<div class="lab-val na">－</div>';
+    else{
+      const disp=ref.fm?ref.fm(v):v;
+      valHtml=`<div class="lab-val ${ref.ok(v)?'ok':'bad'}">${disp}${ref.unit?' '+ref.unit:''}</div>`;
+    }
+    const note=k==='bp'&&r.bpNote?`<div class="lab-note">备注：${esc(r.bpNote)}</div>`:'';
+    return `<div class="lab-item"><div class="lab-name">${ref.name}</div>${valHtml}<div class="lab-ref">参考范围 ${ref.ref}${ref.unit?' '+ref.unit:''}</div>${note}</div>`;
+  }).join('');
+  const iris=irisStage(r.crea);
+  box.innerHTML=`${iris?`<span class="tag tag-purple">${iris}（按当日肌酐 ${r.crea}）</span>`:''}<div class="lab-grid">${items}</div>`;
+}
+
 function renderCasePage(){
   const cat=state.cat||{};
   let catInfo=cat.name||'未命名';
@@ -1197,6 +1334,10 @@ function renderCasePage(){
   const curWeight=ws.length?ws[ws.length-1].value:'-';
   const am=state.medications.filter(m=>!m.endDate||m.endDate>=today());
   document.getElementById('caseSummaryFull').innerHTML=`<div class="cs-cat">🐱 ${esc(catInfo)}</div><ul class="cs-list"><li>主线诊断：<b>慢性肾病 CKD</b>（以 IRIS 3 期为主，最新肌酐 264 μmol/L）</li><li>骨骼：反复桡尺骨骨折手术共 <b>4</b> 次</li><li>麻醉：累计 <b>7</b> 次</li><li>急症：<b>2025-01 输尿管梗阻</b>（肌酐冲至峰值 438）</li><li>泌尿系：反复 <b>FIC</b>（猫特发性膀胱炎）</li><li>消化：<b>2025-05 出血性肠炎</b></li><li>随访：2023-11-03 ~ 2026-06-27，共 <b>41</b> 次就诊、<b>4</b> 个年份</li><li>长期关注：肌酐趋势、慢性呕吐、肾盂扩张</li></ul><div class="cs-meta">当前体重 ${curWeight}kg · 当前用药 ${am.length} 种 · 数据来源：猫咪病例数据2023-2026.xlsx</div>`;
+  renderLabTrend();
+  if(!labSelDate)labSelDate=CASE_LABS.length?CASE_LABS[CASE_LABS.length-1].date:null;
+  renderLabChips();
+  renderLabDetail();
 }
 
 /* ===== 图表 ===== */
