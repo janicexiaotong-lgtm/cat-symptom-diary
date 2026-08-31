@@ -393,7 +393,7 @@ input[type=file]{display:none}
       </div>
       <div class="card">
         <div class="card-title"><span>📈 指标趋势图</span><span class="muted" id="labTrendCount"></span></div>
-        <p class="muted" style="margin-bottom:8px">选择指标（最多 5 项）同时比较，每个指标独立纵轴与时间横轴；绿色带为参考范围；点击圆点查看具体数值</p>
+        <p class="muted" style="margin-bottom:8px">选择指标（最多 5 项）同时比较，每个指标独立纵轴；肌酐按 IRIS 分期着色，其他指标显示参考范围；点击圆点查看具体数值</p>
         <div class="metric-selector" id="labMetricSelector"></div>
         <div class="seg-bar" id="labRangeBar">
           <button class="seg-btn" data-r="6m" onclick="setLabRange('6m')">6个月</button>
@@ -1356,12 +1356,27 @@ const LAB_REFS={
 function irisStage(crea){if(crea==null)return null;if(crea<140)return 'IRIS 1期';if(crea<=250)return 'IRIS 2期';if(crea<=440)return 'IRIS 3期';return 'IRIS 4期';}
 /* 趋势图可选指标（显示值 fm：HCT 转百分比） */
 const LAB_TREND_METRICS={
-  crea:{name:'肌酐',unit:'μmol/L',color:'#D4846A',ref:[71,212],fm:v=>v,scale:[100,450],tick:70},
+  crea:{name:'肌酐',unit:'μmol/L',color:'#7B5FC8',ref:[71,212],fm:v=>v,scale:[100,500],tick:100},
   bun:{name:'尿素氮',unit:'mg/dL',color:'#7EC4AB',ref:[16,36],fm:v=>v},
-  phos:{name:'血磷',unit:'mmol/L',color:'#957DC4',ref:[1.00,2.42],fm:v=>v},
-  ica:{name:'离子钙',unit:'mmol/L',color:'#7BA8C4',ref:[1.15,1.35],fm:v=>v},
-  hct:{name:'HCT',unit:'%',color:'#D4A85C',ref:[30.3,52.3],fm:v=>+(v*100).toFixed(1)}
+  phos:{name:'血磷',unit:'mmol/L',ref:[1.00,2.42],fm:v=>v},
+  ica:{name:'离子钙',unit:'mmol/L',ref:[1.15,1.35],fm:v=>v},
+  hct:{name:'HCT',unit:'%',ref:'30.3~52.3',fm:v=>+(v*100).toFixed(1)}
 };
+/* 病例临床事件（顶部时间线标注用）*/
+const CASE_EVENTS=[
+  {date:'2023-11-03',label:'骨折手术×4'},
+  {date:'2024-02-06',label:'CKD确诊'},
+  {date:'2024-09-13',label:'骨折手术'},
+  {date:'2025-01-12',label:'输尿管梗阻'},
+  {date:'2025-05-10',label:'出血性肠炎'},
+  {date:'2026-08-09',label:'肾盂肾炎（菌尿）'}
+];
+const IRIS_BANDS=[
+  {lo:100,hi:140,color:'#A8DCC9',label:'IRIS 1期(<140)'},
+  {lo:140,hi:250,color:'#AECBE0',label:'IRIS 2期(140~250)'},
+  {lo:250,hi:440,color:'#F0DCA0',label:'IRIS 3期(250~440)'},
+  {lo:440,hi:500,color:'#EBB8B8',label:'IRIS 4期(≥440)'}
+];
 let labMetrics=['crea','bun'];   // 已选指标（最多5）
 let labRange='all';              // 3m / 6m / 1y / all
 function toggleLabMetric(k){
@@ -1390,7 +1405,7 @@ function drawLabCharts(recs){
   const n=recs.length;
   // 数据较多时压缩横向坐标轴（每点宽度 26→20），让数据更密集
   const per=n>20?20:26;
-  const w=Math.max(320,n*per),padL=42,padR=14;
+  const w=Math.max(320,n*per),padL=42,padR=100;
   const cw=w-padL-padR;
   const k=labMetrics.length;
   const rowH=k===1?230:120;               // 每个指标子图高度
@@ -1410,7 +1425,10 @@ function drawLabCharts(recs){
   labMetrics.forEach((key,mi)=>{
     const m=LAB_TREND_METRICS[key];
     const y0=mi*rowH;
-    const tPad=k===1?22:20,bPad=k===1?36:34;
+    const isCrea=key==='crea';
+    // 肌酐专属顶部预留事件标签空间；多选其他指标时压缩
+    const tPad=isCrea?(k===1?44:26):(k===1?22:20);
+    const bPad=k===1?36:34;
     const ch=rowH-tPad-bPad;
     // 纵轴范围：配置了 scale 则固定刻度，否则按数据∪参考范围自适应
     let lo,hi,ticks=null;
@@ -1423,23 +1441,61 @@ function drawLabCharts(recs){
     const yS2=v=>y0+tPad+ch-((v-lo)/(hi-lo))*ch;
     // 网格 + Y 轴刻度
     const drawGrid=v=>{const y=yS2(v);
-      svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w-padR}" y2="${y.toFixed(1)}" stroke="#f0f0f0"/>`;
-      ax+=`<text x="${padL-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#999">${fmt(v,hi-lo)}</text>`;};
+      svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w-padR}" y2="${y.toFixed(1)}" stroke="#EFEAF7"/>`;
+      ax+=`<text x="${padL-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#9E96AD">${fmt(v,hi-lo)}</text>`;};
     if(ticks)ticks.forEach(drawGrid);
     else for(let i=0;i<=4;i++)drawGrid(hi-((hi-lo)/4)*i);
-    // 参考范围淡底色带（透明度 20%，超出纵轴范围的部分裁掉）
-    const by1=yS2(Math.min(m.ref[1],hi)),by2=yS2(Math.max(m.ref[0],lo));
-    svg+=`<rect x="${padL}" y="${by1.toFixed(1)}" width="${w-padL-padR}" height="${Math.max(1,by2-by1).toFixed(1)}" fill="#7EC4AB" fill-opacity="0.2"/>`;
-    // 指标名标签（子图左上角）
-    svg+=`<text x="${padL+2}" y="${(y0+12).toFixed(1)}" font-size="10" fill="${m.color}" font-weight="600">${esc(m.name)}(${m.unit})</text>`;
-    // 平滑曲线（缺失值分段，全部数据）
+    // 子图底部基线
+    svg+=`<line x1="${padL}" y1="${(y0+tPad+ch).toFixed(1)}" x2="${w-padR}" y2="${(y0+tPad+ch).toFixed(1)}" stroke="#E3DCEF" stroke-width="1.2"/>`;
+    if(isCrea){
+      // 4 个 IRIS 分期彩色水平带（低饱和度，透明度 20%，覆盖纵轴范围外部分裁掉）
+      IRIS_BANDS.forEach(b=>{
+        const by1=yS2(Math.min(b.hi,hi)),by2=yS2(Math.max(b.lo,lo));
+        const bh=Math.max(0.5,by2-by1);
+        svg+=`<rect x="${padL}" y="${by1.toFixed(1)}" width="${w-padL-padR}" height="${bh.toFixed(1)}" fill="${b.color}" fill-opacity="0.2"/>`;
+      });
+      // 右侧 IRIS 分期标签
+      IRIS_BANDS.forEach(b=>{
+        const cy=(yS2(Math.min(b.hi,hi))+yS2(Math.max(b.lo,lo)))/2;
+        svg+=`<text x="${(w-padR+6).toFixed(1)}" y="${(cy+3).toFixed(1)}" font-size="10" fill="#5a4a6e" text-anchor="start" font-weight="500">${b.label}</text>`;
+      });
+      // 顶部临床事件时间线（仅单选肌酐时绘制以免过挤）
+      if(k===1){
+        const dtMin=recs[0].date,dtMax=recs[recs.length-1].date;
+        const tSpan=new Date(dtMax)-new Date(dtMin)||1;
+        CASE_EVENTS.forEach(ev=>{
+          if(ev.date<dtMin||ev.date>dtMax)return;
+          const t=(new Date(ev.date)-new Date(dtMin))/tSpan;
+          const ex=padL+t*(w-padL-padR);
+          svg+=`<line x1="${ex.toFixed(1)}" y1="${y0+18}" x2="${ex.toFixed(1)}" y2="${(y0+tPad+ch).toFixed(1)}" stroke="#7B5FC8" stroke-width="0.9" stroke-dasharray="3 3" opacity="0.55"/>`;
+          // 事件标签背景+文字（避免遮挡肌酐曲线）
+          const lw=Math.min(64,esc(ev.label).length*8);
+          svg+=`<rect x="${(ex-lw/2).toFixed(1)}" y="${(y0+3).toFixed(1)}" width="${lw}" height="14" rx="3" fill="#fff" stroke="#7B5FC8" stroke-opacity="0.55" stroke-width="0.8"/>`;
+          svg+=`<text x="${ex.toFixed(1)}" y="${(y0+12.5).toFixed(1)}" font-size="9.5" fill="#5a4a6e" text-anchor="middle">${esc(ev.label)}</text>`;
+        });
+      }
+    }else{
+      // 其他指标：单条参考范围带（透明度 20%，圆角）
+      const by1=yS2(Math.min(m.ref[1],hi)),by2=yS2(Math.max(m.ref[0],lo));
+      svg+=`<rect x="${padL}" y="${by1.toFixed(1)}" width="${w-padL-padR}" height="${Math.max(1,by2-by1).toFixed(1)}" fill="#7EC4AB" fill-opacity="0.2" rx="4"/>`;
+    }
+    // 指标名标签（肌酐位于子图左上角顶部事件下方）
+    const nameY=isCrea?(y0+tPad-6):(y0+12);
+    svg+=`<text x="${padL+2}" y="${nameY.toFixed(1)}" font-size="10" fill="${m.color}" font-weight="600">${esc(m.name)}(${m.unit})</text>`;
+    // 平滑曲线（缺失值分段，全部数据）+ 曲线下柔和渐变面积
     const data=recs.map(r=>r[key]!=null?m.fm(r[key]):null);
     const segs=[];let cur=[];
     data.forEach((v,i)=>{if(v!=null)cur.push(i);else if(cur.length){segs.push(cur);cur=[];}});
     if(cur.length)segs.push(cur);
+    const gid='mg'+(++_gid);
+    svg+=`<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${m.color}" stop-opacity="0.18"/><stop offset="1" stop-color="${m.color}" stop-opacity="0.01"/></linearGradient></defs>`;
     segs.forEach(idxs=>{
       const pts=idxs.map(i=>[xS2(i),yS2(data[i])]);
       if(pts.length<2)return;
+      let ad='M '+pts[0][0].toFixed(1)+','+pts[0][1].toFixed(1);
+      for(let i=1;i<pts.length;i++)ad+=' L '+pts[i][0].toFixed(1)+','+pts[i][1].toFixed(1);
+      ad+=' L '+pts[pts.length-1][0].toFixed(1)+','+(y0+tPad+ch).toFixed(1)+' L '+pts[0][0].toFixed(1)+','+(y0+tPad+ch).toFixed(1)+' Z';
+      svg+=`<path d="${ad}" fill="url(#${gid})" stroke="none"/>`;
       let d=`M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
       for(let i=0;i<pts.length-1;i++){
         const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
@@ -1447,13 +1503,13 @@ function drawLabCharts(recs){
         const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
         d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
       }
-      svg+=`<path d="${d}" fill="none" stroke="${m.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      svg+=`<path d="${d}" fill="none" stroke="${m.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
     });
     // 圆点（抽稀，点击仅显示具体数值）
     data.forEach((v,i)=>{
       if(v==null)return;
       if(i%dotStep!==0&&i!==n-1)return;
-      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.2" fill="#fff" stroke="${m.color}" stroke-width="2" style="cursor:pointer" data-tip="${m.name}：${v}"/>`;
+      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.4" fill="#fff" stroke="${m.color}" stroke-width="2" style="cursor:pointer" data-tip="${m.name}：${v}"/>`;
     });
     // 每个子图自己的时间横轴（字号10、颜色加深；标签重叠时斜向排版）
     labels.forEach((l,i)=>{
@@ -1528,15 +1584,21 @@ function renderCasePage(){
 }
 
 /* ===== 图表 ===== */
+let _gid=0; // SVG 渐变 id 计数器
 function drawBar(labels,data,color){
   if(!labels.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
   const w=Math.max(320,labels.length*36),h=180;const pad={t:20,r:12,b:32,l:32};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
-  const max=Math.max(...data,1)*1.2;const slot=cw/data.length,barW=slot*0.6;
+  const max=Math.max(...data,1)*1.2;const slot=cw/data.length,barW=slot*0.62;
   const yS=v=>pad.t+ch-(v/max)*ch;
+  const baseY=pad.t+ch;
+  let defs='';
+  const gradFor=c=>{const gid='bg'+(++_gid);defs+=`<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity="0.95"/><stop offset="1" stop-color="${c}" stop-opacity="0.5"/></linearGradient>`;return gid;};
   let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
-  for(let i=0;i<=4;i++){const y=pad.t+(ch/4)*i;const v=Math.round(max-(max/4)*i);svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-4}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v}</text>`;}
-  data.forEach((v,i)=>{const x=pad.l+i*slot+(slot-barW)/2;const y=yS(v);const bh=pad.t+ch-y;const c=v>=5?'#ff4d4f':v>=3?'#faad14':color;if(v>0){svg+=`<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${c}" rx="3"/>`;svg+=`<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${c}">${v}</text>`;}});
-  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${pad.l+i*slot+slot/2}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
+  for(let i=0;i<=4;i++){const y=pad.t+(ch/4)*i;const v=Math.round(max-(max/4)*i);svg+=`<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w-pad.r}" y2="${y.toFixed(1)}" stroke="#EFEAF7"/><text x="${pad.l-4}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#9E96AD">${v}</text>`;}
+  svg+=`<line x1="${pad.l}" y1="${baseY}" x2="${w-pad.r}" y2="${baseY}" stroke="#E3DCEF" stroke-width="1.2"/>`;
+  data.forEach((v,i)=>{const x=pad.l+i*slot+(slot-barW)/2;const y=yS(v);const bh=baseY-y;const c=v>=5?'#ff4d4f':v>=3?'#faad14':color;if(v>0){const g=gradFor(c);svg+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(2,bh).toFixed(1)}" fill="url(#${g})" rx="5"/>`;svg+=`<text x="${(x+barW/2).toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${c}">${v}</text>`;}});
+  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${(pad.l+i*slot+slot/2).toFixed(1)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9.5" fill="#9E96AD">${l}</text>`;});
+  if(defs)svg+=`<defs>${defs}</defs>`;
   svg+='</svg>';return svg;
 }
 function drawLine(labels,series,opts){
@@ -1556,23 +1618,40 @@ function drawLine(labels,series,opts){
   const xS2=i=>pad.l+i*xS;const yS2=v=>pad.t+ch-((v-yMin)/yR)*ch;
   let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
   if(yTicks){
-    yTicks.forEach(t=>{if(t<yMin-1e-9||t>yMax+1e-9)return;const y=yS2(t);svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${t.toFixed(1)}</text>`;});
+    yTicks.forEach(t=>{if(t<yMin-1e-9||t>yMax+1e-9)return;const y=yS2(t);svg+=`<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w-pad.r}" y2="${y.toFixed(1)}" stroke="#EFEAF7"/><text x="${pad.l-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#9E96AD">${t.toFixed(1)}</text>`;});
   }else{
-    for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yR/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/><text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${v.toFixed(1)}</text>`;}
+    for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yR/5)*i;svg+=`<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w-pad.r}" y2="${y.toFixed(1)}" stroke="#EFEAF7"/><text x="${pad.l-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#9E96AD">${v.toFixed(1)}</text>`;}
   }
-  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
+  svg+=`<line x1="${pad.l}" y1="${(pad.t+ch).toFixed(1)}" x2="${w-pad.r}" y2="${(pad.t+ch).toFixed(1)}" stroke="#E3DCEF" stroke-width="1.2"/>`;
+  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i).toFixed(1)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9.5" fill="#9E96AD">${l}</text>`;});
   const bw=Math.min(22,(xS||cw/labels.length)*0.5);
   series.forEach(s=>{
     const unit=s.unit||'';const tipName=esc(s.name);
     if(s.type==='bar'){
       const baseY=yS2(0);
-      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';const tip=tipName+': '+v+unit;if(hgt>0.5)svg+=`<rect x="${cx-bw/2}" y="${top}" width="${bw}" height="${hgt}" fill="${col}" rx="2" data-tip="${tip}"/>`;svg+=`<text x="${cx}" y="${v>=0?yv-4:yv+11}" text-anchor="middle" font-size="9" fill="${s.textColor||(v>=0?'#9254de':'#ff4d4f')}">${v}</text>`;});
+      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';const tip=tipName+': '+v+unit;if(hgt>0.5)svg+=`<rect x="${cx.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" fill="${col}" rx="4" data-tip="${tip}"/>`;svg+=`<text x="${cx.toFixed(1)}" y="${(v>=0?yv-4:yv+11).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${s.textColor||(v>=0?'#8E7BB8':'#ff4d4f')}">${v}</text>`;});
     }else{
-      svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i)+','+yS2(v):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
-      s.data.forEach((v,i)=>{if(v!=null){const tip=tipName+': '+v+unit;svg+=`<circle cx="${xS2(i)}" cy="${yS2(v)}" r="3" fill="#fff" stroke="${s.color}" stroke-width="2" data-tip="${tip}"/>`;}});
+      // 缺失值分段
+      const segs=[];let cur=[];
+      s.data.forEach((v,i)=>{if(v!=null)cur.push(i);else if(cur.length){segs.push(cur);cur=[];}});
+      if(cur.length)segs.push(cur);
+      const baseY=pad.t+ch;
+      const gid='lg'+(++_gid);
+      // 曲线下方柔和渐变面积
+      svg+=`<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity="0.22"/><stop offset="1" stop-color="${s.color}" stop-opacity="0.02"/></linearGradient></defs>`;
+      segs.forEach(idxs=>{
+        const pts=idxs.map(i=>[xS2(i),yS2(s.data[i])]);
+        if(pts.length<2)return;
+        let d='M '+pts[0][0].toFixed(1)+','+pts[0][1].toFixed(1);
+        for(let i=1;i<pts.length;i++)d+=' L '+pts[i][0].toFixed(1)+','+pts[i][1].toFixed(1);
+        d+=' L '+pts[pts.length-1][0].toFixed(1)+','+baseY.toFixed(1)+' L '+pts[0][0].toFixed(1)+','+baseY.toFixed(1)+' Z';
+        svg+=`<path d="${d}" fill="url(#${gid})" stroke="none"/>`;
+      });
+      svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i).toFixed(1)+','+yS2(v).toFixed(1):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s.data.forEach((v,i)=>{if(v!=null){const tip=tipName+': '+v+unit;svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.5" fill="#fff" stroke="${s.color}" stroke-width="2.2" data-tip="${tip}"/>`;}});
     }
   });
-  let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="8" width="12" height="3" fill="${s.textColor||s.color}" rx="1"/><text x="${lx+16}" y="13" font-size="10" fill="#666">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
+  let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="7" width="12" height="4" fill="${s.textColor||s.color}" rx="2"/><text x="${lx+16}" y="13" font-size="10" fill="#6B6480">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
   svg+='</svg>';return svg;
 }
 function weightTicks(){
