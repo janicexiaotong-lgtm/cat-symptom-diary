@@ -1083,7 +1083,8 @@ function renderWeightPage(){
     const cut=new Date(anchor);cut.setMonth(cut.getMonth()-conf.months);
     cutoffStr=cut.toISOString().slice(0,10);refLabel='较'+conf.label+'前';
   }else{cutoffStr=sorted[0].date;refLabel='较最早记录';}
-  const refWeight=sorted.find(w=>w.date<=cutoffStr);
+  // 基准点：cutoff 之前最近一次的体重（真正的"N个月前"，而非历史上最早一条）
+  const refWeight=[...sorted].reverse().find(w=>w.date<=cutoffStr);
   // 均值：所选范围内
   const inRange=conf.months>0?sorted.filter(w=>w.date>=cutoffStr):sorted;
   const baseline=inRange.length?+(inRange.reduce((s,w)=>s+w.value,0)/inRange.length).toFixed(2):latest.value;
