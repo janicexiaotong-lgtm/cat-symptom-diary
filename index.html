@@ -1358,9 +1358,9 @@ function irisStage(crea){if(crea==null)return null;if(crea<140)return 'IRIS 1期
 const LAB_TREND_METRICS={
   crea:{name:'肌酐',unit:'μmol/L',color:'#7B5FC8',ref:[71,212],fm:v=>v,scale:[100,500],tick:100},
   bun:{name:'尿素氮',unit:'mg/dL',color:'#7EC4AB',ref:[16,36],fm:v=>v},
-  phos:{name:'血磷',unit:'mmol/L',ref:[1.00,2.42],fm:v=>v},
-  ica:{name:'离子钙',unit:'mmol/L',ref:[1.15,1.35],fm:v=>v},
-  hct:{name:'HCT',unit:'%',ref:'30.3~52.3',fm:v=>+(v*100).toFixed(1)}
+  phos:{name:'血磷',unit:'mmol/L',color:'#E8845E',ref:[1.00,2.42],fm:v=>v,refLabel:true,fillDot:true},
+  ica:{name:'离子钙',unit:'mmol/L',color:'#4EA5D9',ref:[1.15,1.35],fm:v=>v,refLabel:true,fillDot:true},
+  hct:{name:'HCT',unit:'%',color:'#D4A85C',ref:[30.3,52.3],fm:v=>+(v*100).toFixed(1),refLabel:true,fillDot:true}
 };
 /* 病例临床事件（顶部时间线标注用）*/
 const CASE_EVENTS=[
@@ -1478,6 +1478,11 @@ function drawLabCharts(recs){
       // 其他指标：单条参考范围带（透明度 20%，圆角）
       const by1=yS2(Math.min(m.ref[1],hi)),by2=yS2(Math.max(m.ref[0],lo));
       svg+=`<rect x="${padL}" y="${by1.toFixed(1)}" width="${w-padL-padR}" height="${Math.max(1,by2-by1).toFixed(1)}" fill="#7EC4AB" fill-opacity="0.2" rx="4"/>`;
+      // 右侧标注参考范围数值
+      if(m.refLabel){
+        const cy=(by1+by2)/2;
+        svg+=`<text x="${(w-padR+6).toFixed(1)}" y="${(cy+3.5).toFixed(1)}" font-size="9.5" fill="#5a4a6e" text-anchor="start">参考 ${m.ref[0]}~${m.ref[1]}</text>`;
+      }
     }
     // 指标名标签（肌酐位于子图左上角顶部事件下方）
     const nameY=isCrea?(y0+tPad-6):(y0+12);
@@ -1505,11 +1510,14 @@ function drawLabCharts(recs){
       }
       svg+=`<path d="${d}" fill="none" stroke="${m.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
     });
-    // 圆点（抽稀，点击仅显示具体数值）
+    // 圆点（抽稀，点击仅显示具体数值；fillDot 指标用实心彩色更清晰）
+    const dotF=m.fillDot?m.color:'#fff';
+    const dotS=m.fillDot?'#fff':m.color;
+    const dotR=m.fillDot?3.6:3.4;
     data.forEach((v,i)=>{
       if(v==null)return;
       if(i%dotStep!==0&&i!==n-1)return;
-      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.4" fill="#fff" stroke="${m.color}" stroke-width="2" style="cursor:pointer" data-tip="${m.name}：${v}"/>`;
+      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="${dotR}" fill="${dotF}" stroke="${dotS}" stroke-width="2" style="cursor:pointer" data-tip="${m.name}：${v}"/>`;
     });
     // 每个子图自己的时间横轴（字号10、颜色加深；标签重叠时斜向排版）
     labels.forEach((l,i)=>{
