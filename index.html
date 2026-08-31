@@ -630,7 +630,9 @@ async function syncDownload(){
   const status=document.getElementById('syncStatus');
   status.textContent='⏳ 下载中...';
   try{
-    const token=localStorage.getItem('cat_gh_token')||'';
+    // 优先用输入框里的 Token（粘贴新 Token 后直接点下载即可更新凭证，无需上传覆盖云端）
+    const token=document.getElementById('syncToken').value.trim()||localStorage.getItem('cat_gh_token')||'';
+    if(token)localStorage.setItem('cat_gh_token',token);
     const headers={'Accept':'application/json'};
     if(token)headers['Authorization']='token '+token;
     const resp=await fetch(GIST_API+'/'+code,{headers});
