@@ -186,6 +186,12 @@ input[type=file]{display:none}
 .sm-axis svg{display:block}
 .sm-scroll{flex:1 1 auto;overflow-x:auto;min-width:0;scrollbar-width:thin}
 .sm-scroll svg{display:block}
+/* 分段选择按钮（时间范围） */
+.seg-bar{display:inline-flex;gap:0;background:var(--pri-faint);border-radius:11px;padding:3px;margin-bottom:12px}
+.seg-btn{border:none;background:transparent;color:var(--text-secondary);font-size:12px;padding:5px 14px;border-radius:9px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .18s}
+.seg-btn.active{background:var(--card-solid);color:var(--pri);box-shadow:0 1px 5px rgba(140,120,180,.14)}
+/* 药品库存 */
+.btn-use{background:var(--success);color:#fff}
 </style>
 </head>
 <body>
@@ -259,6 +265,11 @@ input[type=file]{display:none}
       <div id="medPastList"></div>
     </div>
     <div class="card">
+      <div class="card-title"><span>📦 药品库存</span><button class="btn btn-sm" onclick="openInvModal()">+ 添加</button></div>
+      <p class="muted" style="margin-bottom:8px">记录未使用药品的库存数量（瓶/盒/支/片等）与保质期；用完后点「用完」从库存移除</p>
+      <div id="invList"></div>
+    </div>
+    <div class="card">
       <div class="card-title"><span>💊 全部用药记录</span><button class="btn btn-sm" onclick="openMedModal()">+ 添加</button></div>
       <div id="medList"></div>
     </div>
@@ -270,6 +281,12 @@ input[type=file]{display:none}
       <div class="card-title"><span>⚖️ 体重变化</span><button class="btn btn-sm" onclick="openWeightModal()">+ 记录</button></div>
       <div id="weightSummary"></div>
       <div class="section-title">体重趋势</div>
+      <div class="seg-bar" id="weightRangeBar">
+        <button class="seg-btn" data-r="3m" onclick="setWeightRange('3m')">3个月</button>
+        <button class="seg-btn active" data-r="6m" onclick="setWeightRange('6m')">6个月</button>
+        <button class="seg-btn" data-r="1y" onclick="setWeightRange('1y')">1年</button>
+        <button class="seg-btn" data-r="all" onclick="setWeightRange('all')">全部</button>
+      </div>
       <div class="chart-box" id="weightChart"></div>
       <div class="section-title">历史记录</div>
       <div id="weightList"></div>
@@ -375,8 +392,15 @@ input[type=file]{display:none}
         <div id="caseSummaryFull"></div>
       </div>
       <div class="card">
-        <div class="card-title"><span>📈 肌酐 / 尿素氮趋势</span></div>
-        <p class="muted" style="margin-bottom:10px">平滑曲线 · 点击曲线上的圆点查看具体数值（2023-11 ~ 2026-08，共 35 次血检）</p>
+        <div class="card-title"><span>📈 指标趋势图</span><span class="muted" id="labTrendCount"></span></div>
+        <p class="muted" style="margin-bottom:8px">选择指标（最多 5 项）同时比较，每个指标独立纵轴与时间横轴；绿色带为参考范围；点击圆点查看具体数值</p>
+        <div class="metric-selector" id="labMetricSelector"></div>
+        <div class="seg-bar" id="labRangeBar">
+          <button class="seg-btn" data-r="6m" onclick="setLabRange('6m')">6个月</button>
+          <button class="seg-btn" data-r="1y" onclick="setLabRange('1y')">1年</button>
+          <button class="seg-btn" data-r="2y" onclick="setLabRange('2y')">2年</button>
+          <button class="seg-btn active" data-r="all" onclick="setLabRange('all')">全部</button>
+        </div>
         <div class="chart-box" id="caseLabTrend"></div>
       </div>
       <div class="card">
@@ -403,7 +427,7 @@ input[type=file]{display:none}
 <div class="tabbar">
   <div class="tab-item active" onclick="switchPage('dashboard')"><span class="tab-icon">🏠</span><span class="tab-label">总览</span></div>
   <div class="tab-item" onclick="switchPage('symptoms')"><span class="tab-icon">📝</span><span class="tab-label">症状</span></div>
-  <div class="tab-item" onclick="switchPage('medications')"><span class="tab-icon">💊</span><span class="tab-label">用药</span></div>
+  <div class="tab-item" onclick="switchPage('medications')"><span class="tab-icon">💊</span><span class="tab-label">药品</span></div>
   <div class="tab-item" onclick="switchPage('weight')"><span class="tab-icon">⚖️</span><span class="tab-label">体重</span></div>
   <div class="tab-item" onclick="switchPage('water')"><span class="tab-icon">💧</span><span class="tab-label">饮水</span></div>
   <div class="tab-item" onclick="switchPage('data')"><span class="tab-icon">💾</span><span class="tab-label">数据</span></div>
@@ -497,6 +521,24 @@ input[type=file]{display:none}
   </div>
 </div>
 
+<!-- 药品库存弹窗 -->
+<div class="modal-mask" id="invModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="invModalTitle">添加药品库存</h3><button class="modal-close" onclick="closeModal('invModal')">×</button></div>
+    <input type="hidden" id="invId">
+    <div class="form-group"><label>药品名称 <span class="req">*</span></label><input class="form-control" id="invName" placeholder="如 生理盐水"></div>
+    <div class="form-row">
+      <div class="form-group"><label>数量 <span class="req">*</span></label><input type="number" min="0" step="any" class="form-control" id="invQty" placeholder="如 2"></div>
+      <div class="form-group"><label>单位</label><input class="form-control" id="invUnit" list="invUnitList" placeholder="瓶 / 盒 / 支 / 片…">
+        <datalist id="invUnitList"><option value="瓶"></option><option value="盒"></option><option value="支"></option><option value="片"></option><option value="袋"></option><option value="包"></option><option value="罐"></option><option value="ml"></option></datalist>
+      </div>
+    </div>
+    <div class="form-group"><label>保质期至</label><input type="date" class="form-control" id="invExpiry"></div>
+    <div class="form-group"><label>备注</label><input class="form-control" id="invNote" placeholder="如 开封后冷藏"></div>
+    <button class="btn btn-block" onclick="saveInv()">保存</button>
+  </div>
+</div>
+
 <!-- 饮水/尿量记录弹窗 -->
 <div class="modal-mask" id="waterModal">
   <div class="modal">
@@ -519,7 +561,7 @@ input[type=file]{display:none}
 
 <script>
 const KEY='cat_symptom_v1';
-let state={cat:{name:'',breed:'',birthDate:'',gender:'公',neutered:'已绝育'},symptoms:[],medications:[],weights:[],medCheckins:[],waterRecords:[]};
+let state={cat:{name:'',breed:'',birthDate:'',gender:'公',neutered:'已绝育'},symptoms:[],medications:[],weights:[],medCheckins:[],waterRecords:[],inventory:[]};
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
 let editingImages=[];
 const SYMPTOM_TYPES=[{key:'呕吐',emoji:'🤮',color:'#ff4d4f'},{key:'咳嗽',emoji:'😷',color:'#faad14'},{key:'腹泻',emoji:'💩',color:'#fa8c16'},{key:'尿频',emoji:'🚽',color:'#eb2f96'},{key:'排尿异常',emoji:'💧',color:'#13c2c2'},{key:'其他',emoji:'📝',color:'#8c8c8c'}];
@@ -633,7 +675,7 @@ function switchPage(n){
   window.scrollTo(0,0);
   if(n==='dashboard')renderDashboard();
   if(n==='symptoms')renderSymptomPage();
-  if(n==='medications'){renderMedPage();renderMedCalendar();renderMedPastList();renderMedCheckin();}
+  if(n==='medications'){renderMedPage();renderMedCalendar();renderMedPastList();renderMedCheckin();renderInventory();}
   if(n==='weight')renderWeightPage();
   if(n==='water')renderWaterPage();
   if(n==='calendar')renderCalendar();
@@ -883,12 +925,26 @@ function renderMedCalendarBox(boxId,meds,t){
   const box=document.getElementById(boxId);
   if(!meds.length){box.innerHTML='<div class="empty" style="padding:20px"><p>暂无记录</p></div>';return;}
   const now=new Date();
-  const start=new Date(now.getFullYear(),now.getMonth()-2,1);
-  const totalDays=Math.ceil((now-start)/86400000);
+  // 起始月份 = 最早用药开始日期所在月份（无开始日期则默认近3个月；不晚于当前月）
+  const starts=meds.filter(m=>m.startDate).map(m=>new Date(m.startDate));
+  let start;
+  if(starts.length){
+    const e=new Date(Math.min(...starts));
+    start=new Date(e.getFullYear(),e.getMonth(),1);
+  }else{start=new Date(now.getFullYear(),now.getMonth()-2,1);}
+  const curM=new Date(now.getFullYear(),now.getMonth(),1);
+  if(start>curM)start=curM;
+  const totalDays=Math.max(1,Math.ceil((now-start)/86400000));
   const colors=['#9254de','#1890ff','#52c41a','#722ed1','#faad14','#ff4d4f','#13c2c2','#eb2f96'];
-  let html='<div style="overflow-x:auto;"><div style="min-width:380px;">';
+  // 月份标签（跨年时带年份）
+  const monthLabels=[];const mm=new Date(start);
+  while(mm<=curM){
+    monthLabels.push((mm.getFullYear()!==now.getFullYear()?(mm.getFullYear()%100)+'年':'')+(mm.getMonth()+1)+'月');
+    mm.setMonth(mm.getMonth()+1);
+  }
+  let html='<div style="overflow-x:auto;"><div style="min-width:'+Math.max(380,monthLabels.length*90)+'px;">';
   html+='<div style="display:flex;height:20px;margin-bottom:8px;font-size:10px;color:#999;">';
-  for(let i=0;i<3;i++){const d=new Date(start.getFullYear(),start.getMonth()+i,1);html+=`<div style="flex:1;text-align:center;">${d.getMonth()+1}月</div>`;}
+  monthLabels.forEach(lb=>{html+=`<div style="flex:1;text-align:center;">${lb}</div>`;});
   html+='</div>';
   meds.forEach((m,i)=>{
     if(!m.startDate)return;
@@ -956,21 +1012,81 @@ function renderHeatmap(){
 function openWeightModal(){document.getElementById('weightModal').classList.add('show');document.getElementById('weightDate').value=today();document.getElementById('weightValue').value='';document.getElementById('weightNote').value='';}
 function saveWeight(){const date=val('weightDate');const value=parseFloat(val('weightValue'));if(!date){toast('请选日期');return;}if(!value){toast('请输入体重');return;}state.weights.push({id:uid(),date,value,note:val('weightNote')});saveData();closeModal('weightModal');toast('保存成功');renderWeightPage();renderDashboard();}
 function deleteWeight(id){if(!confirm('确定删除？'))return;state.weights=state.weights.filter(x=>x.id!==id);saveData();toast('已删除');renderWeightPage();renderDashboard();}
+/* ===== 药品库存 ===== */
+function renderInventory(){
+  const box=document.getElementById('invList');
+  if(!box)return;
+  if(!state.inventory)state.inventory=[];
+  if(!state.inventory.length){box.innerHTML='<div class="empty" style="padding:24px 10px"><p>暂无库存记录，点右上「+ 添加」录入</p></div>';return;}
+  const t=today();
+  box.innerHTML=[...state.inventory].sort((a,b)=>(a.expiry||'9999-12-31').localeCompare(b.expiry||'9999-12-31')).map(it=>{
+    let expTag='';
+    if(it.expiry){
+      const days=Math.round((new Date(it.expiry)-new Date(t))/86400000);
+      if(days<0)expTag=`<span class="tag tag-red">已过期</span>`;
+      else if(days<=30)expTag=`<span class="tag tag-orange">临期·剩${days}天</span>`;
+      else expTag=`<span class="tag tag-gray">保质期至 ${it.expiry}</span>`;
+    }
+    return `<div class="list-item"><div class="main"><div class="title-row"><span class="title">📦 ${esc(it.name)}</span><span class="tag tag-blue">${it.qty}${esc(it.unit||'')}</span>${expTag}</div>${it.note?`<div class="desc">${esc(it.note)}</div>`:''}</div>
+      <div class="actions"><button class="btn btn-sm btn-outline" onclick="openInvModal('${it.id}')">编辑</button><button class="btn btn-sm btn-use" onclick="useInv('${it.id}')">用完</button></div></div>`;
+  }).join('');
+}
+function openInvModal(id){
+  const it=id?state.inventory.find(x=>x.id===id):null;
+  document.getElementById('invModal').classList.add('show');
+  document.getElementById('invModalTitle').textContent=it?'编辑药品库存':'添加药品库存';
+  document.getElementById('invId').value=it?it.id:'';
+  document.getElementById('invName').value=it?it.name:'';
+  document.getElementById('invQty').value=it?it.qty:'';
+  document.getElementById('invUnit').value=it?it.unit:'';
+  document.getElementById('invExpiry').value=it?it.expiry:'';
+  document.getElementById('invNote').value=it?it.note:'';
+}
+function saveInv(){
+  const id=document.getElementById('invId').value;
+  const name=document.getElementById('invName').value.trim();
+  const qty=parseFloat(document.getElementById('invQty').value);
+  const unit=document.getElementById('invUnit').value.trim();
+  const expiry=document.getElementById('invExpiry').value;
+  const note=document.getElementById('invNote').value.trim();
+  if(!name){toast('请输入药品名称');return;}
+  if(isNaN(qty)||qty<0){toast('请输入正确的数量');return;}
+  if(id){const it=state.inventory.find(x=>x.id===id);if(it)Object.assign(it,{name,qty,unit,expiry,note});}
+  else state.inventory.push({id:uid(),name,qty,unit,expiry,note});
+  saveData();closeModal('invModal');toast('保存成功');renderInventory();
+}
+function useInv(id){
+  const it=state.inventory.find(x=>x.id===id);
+  if(!it)return;
+  if(!confirm(`「${it.name}」已使用完毕，从库存删除？`))return;
+  state.inventory=state.inventory.filter(x=>x.id!==id);
+  saveData();toast('已从库存移除');renderInventory();
+}
+
+let weightRange='6m'; // 3m / 6m / 1y / all
+const WEIGHT_RANGE_CONF={ '3m':{months:3,label:'3个月',meanLabel:'3月均值'}, '6m':{months:6,label:'6个月',meanLabel:'6月均值'}, '1y':{months:12,label:'1年',meanLabel:'1年均值'}, 'all':{months:0,label:'全部',meanLabel:'总体均值'} };
+function setWeightRange(r){
+  weightRange=r;
+  document.querySelectorAll('#weightRangeBar .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.r===r));
+  renderWeightPage();
+}
 function renderWeightPage(){
   const sorted=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
   const summary=document.getElementById('weightSummary');
   if(!sorted.length){summary.innerHTML='<div class="empty"><div class="emoji">⚖️</div><p>暂无体重记录</p></div>';document.getElementById('weightChart').innerHTML='';document.getElementById('weightList').innerHTML='';return;}
   const latest=sorted[sorted.length-1];
-  // 基准点：6个月前的体重
-  const now=new Date();
-  const sixMonthsAgo=new Date(now);sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
-  const sixMonthsAgoStr=sixMonthsAgo.toISOString().slice(0,10);
-  const refWeight=sorted.find(w=>w.date<=sixMonthsAgoStr);
-  // 基准线：3个月内体重平均值
-  const threeMonthsAgo=new Date(now);threeMonthsAgo.setMonth(threeMonthsAgo.getMonth()-3);
-  const threeMonthsAgoStr=threeMonthsAgo.toISOString().slice(0,10);
-  const recentWeights=sorted.filter(w=>w.date>=threeMonthsAgoStr);
-  const baseline=recentWeights.length?+(recentWeights.reduce((s,w)=>s+w.value,0)/recentWeights.length).toFixed(2):latest.value;
+  const conf=WEIGHT_RANGE_CONF[weightRange];
+  // 基准点：以最新记录日期为锚点，回推所选范围
+  const anchor=new Date(latest.date);
+  let cutoffStr,refLabel;
+  if(conf.months>0){
+    const cut=new Date(anchor);cut.setMonth(cut.getMonth()-conf.months);
+    cutoffStr=cut.toISOString().slice(0,10);refLabel='较'+conf.label+'前';
+  }else{cutoffStr=sorted[0].date;refLabel='较最早记录';}
+  const refWeight=sorted.find(w=>w.date<=cutoffStr);
+  // 均值：所选范围内
+  const inRange=conf.months>0?sorted.filter(w=>w.date>=cutoffStr):sorted;
+  const baseline=inRange.length?+(inRange.reduce((s,w)=>s+w.value,0)/inRange.length).toFixed(2):latest.value;
 
   let changeStr='-',pctStr='-',changeColor='#999';
   if(refWeight){
@@ -980,10 +1096,9 @@ function renderWeightPage(){
     changeColor=change<0?'#52c41a':change>0?'#ff4d4f':'#999';
   }
 
-  summary.innerHTML=`<div style="display:flex;justify-content:space-around;text-align:center;margin:10px 0;flex-wrap:wrap;gap:10px"><div><div style="font-size:28px;font-weight:700;color:#9254de">${latest.value}</div><div class="muted">kg 最新</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${changeStr}</div><div class="muted">kg 较6个月前</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${pctStr}</div><div class="muted">变化率</div></div><div><div style="font-size:28px;font-weight:700;color:#722ed1">${baseline}</div><div class="muted">kg 3月均值</div></div></div>`;
-  // 趋势图只显示近6个月
-  const sixMonthsData=sorted.filter(w=>w.date>=sixMonthsAgoStr);
-  const chartData=sixMonthsData.length?sixMonthsData:sorted;
+  summary.innerHTML=`<div style="display:flex;justify-content:space-around;text-align:center;margin:10px 0;flex-wrap:wrap;gap:10px"><div><div style="font-size:28px;font-weight:700;color:#9254de">${latest.value}</div><div class="muted">kg 最新</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${changeStr}</div><div class="muted">kg ${refLabel}</div></div><div><div style="font-size:28px;font-weight:700;color:${changeColor}">${pctStr}</div><div class="muted">变化率</div></div><div><div style="font-size:28px;font-weight:700;color:#722ed1">${baseline}</div><div class="muted">kg ${conf.meanLabel}</div></div></div>`;
+  // 趋势图：按所选时间范围过滤
+  const chartData=inRange.length?inRange:sorted;
   const wc=document.getElementById('weightChart');
   wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
   bindChartTips(wc);
@@ -1236,29 +1351,91 @@ const LAB_REFS={
   hct:{name:'HCT',unit:'%',ref:'30.3~52.3',ok:v=>v*100>=30.3&&v*100<=52.3,fm:v=>+(v*100).toFixed(1)}
 };
 function irisStage(crea){if(crea==null)return null;if(crea<140)return 'IRIS 1期';if(crea<=250)return 'IRIS 2期';if(crea<=440)return 'IRIS 3期';return 'IRIS 4期';}
-function drawSmooth(labels,series,dates){
-  if(!labels.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
-  const w=Math.max(320,labels.length*26),h=230;const pad={t:26,r:14,b:36,l:42};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
-  let yMax=-Infinity;series.forEach(s=>s.data.forEach(v=>{if(v!=null&&v>yMax)yMax=v;}));
-  if(!isFinite(yMax))yMax=100;
-  yMax=Math.ceil(yMax*1.08/50)*50;
-  const xS=labels.length>1?cw/(labels.length-1):0;
-  const xS2=i=>pad.l+i*xS;const yS2=v=>pad.t+ch-(v/yMax)*ch;
-  // 固定 Y 轴（不随横向滚动）
-  let ax=`<svg viewBox="0 0 ${pad.l} ${h}" width="${pad.l}" height="${h}">`;
-  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;const v=yMax-(yMax/5)*i;ax+=`<text x="${pad.l-5}" y="${y+3}" text-anchor="end" font-size="9" fill="#999">${Math.round(v)}</text>`;}
-  ax+='</svg>';
-  // 主体（viewBox 从 pad.l 起，左侧 Y 轴区被裁掉，网格横线仍绘制）
-  let svg=`<svg viewBox="${pad.l} 0 ${w-pad.l} ${h}" width="${w-pad.l}" height="${h}">`;
-  for(let i=0;i<=5;i++){const y=pad.t+(ch/5)*i;svg+=`<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="#f0f0f0"/>`;}
-  const step=Math.ceil(labels.length/9);
-  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${xS2(i)}" y="${h-pad.b+15}" text-anchor="middle" font-size="9" fill="#999">${l}</text>`;});
-  series.forEach(s=>{
+/* 趋势图可选指标（显示值 fm：HCT 转百分比） */
+const LAB_TREND_METRICS={
+  crea:{name:'肌酐',unit:'μmol/L',color:'#D4846A',ref:[71,212],fm:v=>v,scale:[100,450],tick:70},
+  bun:{name:'尿素氮',unit:'mg/dL',color:'#7EC4AB',ref:[16,36],fm:v=>v},
+  phos:{name:'血磷',unit:'mmol/L',color:'#957DC4',ref:[1.00,2.42],fm:v=>v},
+  ica:{name:'离子钙',unit:'mmol/L',color:'#7BA8C4',ref:[1.15,1.35],fm:v=>v},
+  hct:{name:'HCT',unit:'%',color:'#D4A85C',ref:[30.3,52.3],fm:v=>+(v*100).toFixed(1)}
+};
+let labMetrics=['crea','bun'];   // 已选指标（最多5）
+let labRange='all';              // 3m / 6m / 1y / all
+function toggleLabMetric(k){
+  if(labMetrics.includes(k)){if(labMetrics.length>1)labMetrics=labMetrics.filter(x=>x!==k);}
+  else{if(labMetrics.length>=5){toast('最多同时比较 5 项指标');return;}labMetrics.push(k);}
+  renderLabMetricSelector();renderLabTrend();
+}
+function setLabRange(r){labRange=r;document.querySelectorAll('#labRangeBar .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.r===r));renderLabTrend();}
+function renderLabMetricSelector(){
+  const bar=document.getElementById('labMetricSelector');
+  bar.innerHTML=Object.keys(LAB_TREND_METRICS).map(k=>{
+    const m=LAB_TREND_METRICS[k];const on=labMetrics.includes(k);
+    return `<span class="metric-chip${on?' active':''}" style="${on?'border-color:'+m.color+';background:'+m.color:''}" onclick="toggleLabMetric('${k}')">${m.name}</span>`;
+  }).join('');
+}
+const LAB_RANGE_LABELS={'6m':'近6个月','1y':'近1年','2y':'近2年','all':'全部'};
+function labRangeRecords(){
+  if(labRange==='all')return CASE_LABS.slice();
+  const anchor=CASE_LABS[CASE_LABS.length-1].date;
+  const a=new Date(anchor);const months=labRange==='6m'?6:labRange==='1y'?12:24;
+  a.setMonth(a.getMonth()-months);
+  const start=a.toISOString().slice(0,10);
+  return CASE_LABS.filter(r=>r.date>=start);
+}
+function drawLabCharts(recs){
+  const n=recs.length;
+  // 数据较多时压缩横向坐标轴（每点宽度 26→20），让数据更密集
+  const per=n>20?20:26;
+  const w=Math.max(320,n*per),padL=42,padR=14;
+  const cw=w-padL-padR;
+  const k=labMetrics.length;
+  const rowH=k===1?230:120;               // 每个指标子图高度
+  const h=rowH*k;
+  const xS=n>1?cw/(n-1):0;
+  const xS2=i=>padL+i*xS;
+  const labels=recs.map(r=>r.date.slice(2));
+  let ax=`<svg viewBox="0 0 ${padL} ${h}" width="${padL}" height="${h}">`;
+  let svg=`<svg viewBox="${padL} 0 ${w-padL} ${h}" width="${w-padL}" height="${h}">`;
+  // 圆点抽稀：点距 < 18px 时按步长抽稀（曲线仍用全部数据）
+  const pxPer=n>1?xS:cw;const dotStep=pxPer<18?Math.ceil(18/pxPer):1;
+  // 时间横轴标签：间距不足时斜向排版防重叠
+  const shownStep=Math.ceil(n/8);
+  const shownSpacing=n>1?xS*shownStep:cw;
+  const rotate=shownSpacing<48;
+  const fmt=(v,range)=>range<5?(+v.toFixed(2)):(range<50?+v.toFixed(1):Math.round(v));
+  labMetrics.forEach((key,mi)=>{
+    const m=LAB_TREND_METRICS[key];
+    const y0=mi*rowH;
+    const tPad=k===1?22:20,bPad=k===1?36:34;
+    const ch=rowH-tPad-bPad;
+    // 纵轴范围：配置了 scale 则固定刻度，否则按数据∪参考范围自适应
+    let lo,hi,ticks=null;
+    if(m.scale){lo=m.scale[0];hi=m.scale[1];ticks=[];for(let v=lo;v<=hi+1e-9;v+=m.tick)ticks.push(+v.toFixed(2));}
+    else{
+      const vals=recs.map(r=>r[key]!=null?m.fm(r[key]):null).filter(v=>v!=null);
+      lo=Math.min(...vals,m.ref[0]);hi=Math.max(...vals,m.ref[1]);
+      const span=(hi-lo)||1;lo-=span*0.12;hi+=span*0.12;
+    }
+    const yS2=v=>y0+tPad+ch-((v-lo)/(hi-lo))*ch;
+    // 网格 + Y 轴刻度
+    const drawGrid=v=>{const y=yS2(v);
+      svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w-padR}" y2="${y.toFixed(1)}" stroke="#f0f0f0"/>`;
+      ax+=`<text x="${padL-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#999">${fmt(v,hi-lo)}</text>`;};
+    if(ticks)ticks.forEach(drawGrid);
+    else for(let i=0;i<=4;i++)drawGrid(hi-((hi-lo)/4)*i);
+    // 参考范围淡底色带（透明度 20%，超出纵轴范围的部分裁掉）
+    const by1=yS2(Math.min(m.ref[1],hi)),by2=yS2(Math.max(m.ref[0],lo));
+    svg+=`<rect x="${padL}" y="${by1.toFixed(1)}" width="${w-padL-padR}" height="${Math.max(1,by2-by1).toFixed(1)}" fill="#7EC4AB" fill-opacity="0.2"/>`;
+    // 指标名标签（子图左上角）
+    svg+=`<text x="${padL+2}" y="${(y0+12).toFixed(1)}" font-size="10" fill="${m.color}" font-weight="600">${esc(m.name)}(${m.unit})</text>`;
+    // 平滑曲线（缺失值分段，全部数据）
+    const data=recs.map(r=>r[key]!=null?m.fm(r[key]):null);
     const segs=[];let cur=[];
-    s.data.forEach((v,i)=>{if(v!=null)cur.push(i);else if(cur.length){segs.push(cur);cur=[];}});
+    data.forEach((v,i)=>{if(v!=null)cur.push(i);else if(cur.length){segs.push(cur);cur=[];}});
     if(cur.length)segs.push(cur);
     segs.forEach(idxs=>{
-      const pts=idxs.map(i=>[xS2(i),yS2(s.data[i])]);
+      const pts=idxs.map(i=>[xS2(i),yS2(data[i])]);
       if(pts.length<2)return;
       let d=`M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
       for(let i=0;i<pts.length-1;i++){
@@ -1267,26 +1444,33 @@ function drawSmooth(labels,series,dates){
         const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
         d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
       }
-      svg+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      svg+=`<path d="${d}" fill="none" stroke="${m.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
     });
-    s.data.forEach((v,i)=>{
+    // 圆点（抽稀，点击仅显示具体数值）
+    data.forEach((v,i)=>{
       if(v==null)return;
-      const dt=dates?dates[i]:labels[i];
-      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.4" fill="#fff" stroke="${s.color}" stroke-width="2" style="cursor:pointer" data-tip="${s.name}：${v} · ${dt}"/>`;
+      if(i%dotStep!==0&&i!==n-1)return;
+      svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.2" fill="#fff" stroke="${m.color}" stroke-width="2" style="cursor:pointer" data-tip="${m.name}：${v}"/>`;
+    });
+    // 每个子图自己的时间横轴（字号10、颜色加深；标签重叠时斜向排版）
+    labels.forEach((l,i)=>{
+      if(i%shownStep!==0&&i!==n-1)return;
+      const lx=xS2(i),ly=y0+tPad+ch+16;
+      svg+=rotate
+        ?`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="end" font-size="10" fill="#8a8a99" transform="rotate(-32 ${lx.toFixed(1)} ${ly.toFixed(1)})">${l}</text>`
+        :`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="10" fill="#8a8a99">${l}</text>`;
     });
   });
-  svg+='</svg>';
-  let legend='<div class="sm-legend">';series.forEach(s=>{legend+=`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`;});legend+='</div>';
-  return `<div class="sm-wrap">${legend}<div class="sm-body"><div class="sm-axis">${ax}</div><div class="sm-scroll">${svg}</div></div></div>`;
+  svg+='</svg>';ax+='</svg>';
+  return `<div class="sm-body"><div class="sm-axis">${ax}</div><div class="sm-scroll">${svg}</div></div>`;
 }
 function renderLabTrend(){
-  const recs=CASE_LABS.filter(r=>r.crea!=null||r.bun!=null);
   const box=document.getElementById('caseLabTrend');
-  if(!recs.length){box.innerHTML='<div class="empty" style="padding:20px"><p>暂无血检数据</p></div>';return;}
-  box.innerHTML=drawSmooth(recs.map(r=>r.date.slice(2)),[
-    {name:'肌酐(μmol/L)',color:'#D4846A',data:recs.map(r=>r.crea)},
-    {name:'尿素氮(mg/dL)',color:'#7EC4AB',data:recs.map(r=>r.bun)}
-  ],recs.map(r=>r.date));
+  const recs=labRangeRecords().filter(r=>labMetrics.some(k=>r[k]!=null));
+  document.getElementById('labTrendCount').textContent=recs.length?(LAB_RANGE_LABELS[labRange]+' '+recs.length+' 次检查'):'';
+  if(!recs.length){box.innerHTML='<div class="empty" style="padding:20px"><p>该时间段暂无血检数据</p></div>';return;}
+  const rangeTip=`<div class="muted" style="font-size:11px;margin-top:6px">⏱ 时间范围：${recs[0].date} ~ ${recs[recs.length-1].date}（${LAB_RANGE_LABELS[labRange]}，共 ${recs.length} 次检查）</div>`;
+  box.innerHTML=drawLabCharts(recs)+rangeTip;
   bindChartTips(box);
 }
 let labSelDate=null;
@@ -1334,7 +1518,7 @@ function renderCasePage(){
   const curWeight=ws.length?ws[ws.length-1].value:'-';
   const am=state.medications.filter(m=>!m.endDate||m.endDate>=today());
   document.getElementById('caseSummaryFull').innerHTML=`<div class="cs-cat">🐱 ${esc(catInfo)}</div><ul class="cs-list"><li>主线诊断：<b>慢性肾病 CKD</b>（以 IRIS 3 期为主，最新肌酐 264 μmol/L）</li><li>骨骼：反复桡尺骨骨折手术共 <b>4</b> 次</li><li>麻醉：累计 <b>7</b> 次</li><li>急症：<b>2025-01 输尿管梗阻</b>（肌酐冲至峰值 438）</li><li>泌尿系：反复 <b>FIC</b>（猫特发性膀胱炎）</li><li>消化：<b>2025-05 出血性肠炎</b></li><li>随访：2023-11-03 ~ 2026-06-27，共 <b>41</b> 次就诊、<b>4</b> 个年份</li><li>长期关注：肌酐趋势、慢性呕吐、肾盂扩张</li></ul><div class="cs-meta">当前体重 ${curWeight}kg · 当前用药 ${am.length} 种 · 数据来源：猫咪病例数据2023-2026.xlsx</div>`;
-  renderLabTrend();
+  renderLabMetricSelector();renderLabTrend();
   if(!labSelDate)labSelDate=CASE_LABS.length?CASE_LABS[CASE_LABS.length-1].date:null;
   renderLabChips();
   renderLabDetail();
@@ -1429,8 +1613,8 @@ function exportExcel(){
   XLSX.writeFile(wb,`猫咪症状数据_${today()}.xlsx`);toast('已导出');
 }
 function exportJSON(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`猫咪症状备份_${today()}.json`;a.click();URL.revokeObjectURL(url);toast('已导出');}
-function importJSON(file){const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d||typeof d!=='object')throw 0;state=Object.assign({cat:state.cat,symptoms:[],medications:[],weights:[],medCheckins:[],waterRecords:[]},d);if(!state.medCheckins)state.medCheckins=[];if(!state.waterRecords)state.waterRecords=[];saveData();toast('导入成功');switchPage('dashboard');}catch(e){toast('格式错误');}};r.readAsText(file);}
-function confirmClear(){if(!confirm('⚠️ 将清空所有数据！确定？'))return;if(!confirm('再次确认：真的清空？'))return;state={cat:state.cat,symptoms:[],medications:[],weights:[],medCheckins:[],waterRecords:[]};saveData();toast('已清空');renderDashboard();}
+function importJSON(file){const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d||typeof d!=='object')throw 0;state=Object.assign({cat:state.cat,symptoms:[],medications:[],weights:[],medCheckins:[],waterRecords:[],inventory:[]},d);if(!state.medCheckins)state.medCheckins=[];if(!state.waterRecords)state.waterRecords=[];if(!state.inventory)state.inventory=[];saveData();toast('导入成功');switchPage('dashboard');}catch(e){toast('格式错误');}};r.readAsText(file);}
+function confirmClear(){if(!confirm('⚠️ 将清空所有数据！确定？'))return;if(!confirm('再次确认：真的清空？'))return;state={cat:state.cat,symptoms:[],medications:[],weights:[],medCheckins:[],waterRecords:[],inventory:[]};saveData();toast('已清空');renderDashboard();}
 function loadSampleData(){
   if(state.symptoms.length)if(!confirm('将合并示例数据，是否继续？'))return;
   state.cat={name:'橘子',breed:'橘猫',birthDate:'2021-05-10',gender:'公',neutered:'已绝育'};
