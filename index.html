@@ -305,6 +305,7 @@ input[type=file]{display:none}
     <div class="card">
       <div class="card-title"><span>📊 年度饮水 / 尿量</span></div>
       <div class="metric-selector" id="waterYearSelector"></div>
+      <div class="metric-selector" id="waterMonthSelector" style="display:none"></div>
       <div class="chart-box" id="waterChart"></div>
     </div>
     <div class="card">
@@ -1147,29 +1148,43 @@ function renderWaterPage(){
   const grid=document.getElementById('waterStatGrid');
   const list=document.getElementById('waterList');
   const sel=document.getElementById('waterYearSelector');
+  const msel=document.getElementById('waterMonthSelector');
   const box=document.getElementById('waterChart');
   if(!state.waterRecords.length){
     grid.innerHTML='<div class="empty" style="padding:16px"><p>暂无记录</p></div>';
-    sel.innerHTML='';box.innerHTML='';list.innerHTML='<div class="empty" style="padding:20px"><p>暂无每日记录</p></div>';
+    sel.innerHTML='';msel.style.display='none';msel.innerHTML='';box.innerHTML='';list.innerHTML='<div class="empty" style="padding:20px"><p>暂无每日记录</p></div>';
     return;
   }
   const sorted=[...state.waterRecords].sort((a,b)=>a.date.localeCompare(b.date));
-  const latest=sorted[sorted.length-1];
-  const days=sorted.length;
-  const avgWater=Math.round(sorted.reduce((s,r)=>s+r.intake,0)/days);
-  const w=getWeightOnDate(latest.date);
-  const lastOut=latest.output!=null&&!isNaN(latest.output)?latest.output:null;
-  const lastRetained=lastOut!=null?latest.intake-lastOut:null;
-  const lastPerKg=w&&lastRetained!=null?+(lastRetained/w).toFixed(2):null;
-  grid.innerHTML=`<div class="stat-box"><div class="stat-num" style="color:#7BA8C4">${latest.intake}</div><div class="stat-label">ml 最近饮水</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#7EC4AB">${lastOut!=null?lastOut:'-'}</div><div class="stat-label">ml 最近尿量</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#957DC4">${lastRetained!=null?lastRetained:'-'}</div><div class="stat-label">ml 最近存水</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:#8DB89A">${lastPerKg!=null?lastPerKg:'-'}</div><div class="stat-label">每kg存水</div></div>`;
   const years=[...new Set(sorted.map(r=>r.date.slice(0,4)))].sort().reverse();
   const cur=window._waterYear&&years.includes(window._waterYear)?window._waterYear:years[0];
   window._waterYear=cur;
-  sel.innerHTML=years.map(y=>`<span class="metric-chip ${y===cur?'active':''}" onclick="window._waterYear='${y}';renderWaterPage()">${y}</span>`).join('');
-  drawWaterChart(cur);
+  // 顶部统计：按所选年份显示该年日均
+  const yrRecs=sorted.filter(r=>r.date.slice(0,4)===cur);
+  const yDays=yrRecs.length;
+  const yAvgIn=yDays?Math.round(yrRecs.reduce((s,r)=>s+r.intake,0)/yDays):0;
+  const outRecs=yrRecs.filter(r=>r.output!=null&&!isNaN(r.output));
+  const yAvgOut=outRecs.length?Math.round(outRecs.reduce((s,r)=>s+r.output,0)/outRecs.length):null;
+  const yAvgStore=yAvgOut!=null?yAvgIn-yAvgOut:null;
+  grid.innerHTML=`<div class="stat-box"><div class="stat-num" style="color:#7BA8C4">${yAvgIn}</div><div class="stat-label">ml ${cur}年日均饮水</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#7EC4AB">${yAvgOut!=null?yAvgOut:'-'}</div><div class="stat-label">ml ${cur}年日均尿量</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#957DC4">${yAvgStore!=null?yAvgStore:'-'}</div><div class="stat-label">ml ${cur}年日均存水</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#8DB89A">${yDays}</div><div class="stat-label">天 记录数</div></div>`;
+  sel.innerHTML=years.map(y=>`<span class="metric-chip ${y===cur?'active':''}" onclick="window._waterYear='${y}';window._waterMonth=null;renderWaterPage()">${y}</span>`).join('');
+  // 当前年份：显示月份选择条（可下钻每日趋势）；往年自动归档为年度视图
+  const isCurYear=cur===String(new Date().getFullYear());
+  if(isCurYear){
+    const months=[...new Set(yrRecs.map(r=>r.date.slice(5,7)))].sort();
+    const m=window._waterMonth&&months.includes(window._waterMonth)?window._waterMonth:null;
+    window._waterMonth=m;
+    msel.style.display='flex';
+    msel.innerHTML=`<span class="metric-chip ${!m?'active':''}" onclick="window._waterMonth=null;renderWaterPage()">全年</span>`+months.map(mm=>`<span class="metric-chip ${m===mm?'active':''}" onclick="window._waterMonth='${mm}';renderWaterPage()">${+mm}月</span>`).join('');
+    drawWaterChart(cur,m);
+  }else{
+    msel.style.display='none';msel.innerHTML='';
+    window._waterMonth=null;
+    drawWaterChart(cur,null);
+  }
   const rev=[...sorted].reverse();
   list.innerHTML=rev.map(r=>{
     const out=r.output!=null&&!isNaN(r.output)?r.output:null;
@@ -1181,15 +1196,27 @@ function renderWaterPage(){
       <div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWaterRecord('${r.id}')">删除</button></div></div>`;
   }).join('');
 }
-function drawWaterChart(year){
+function drawWaterChart(year,month){
   const box=document.getElementById('waterChart');
+  if(month){
+    // 当前年份单月视图：每日趋势
+    const recs=state.waterRecords.filter(r=>r.date.slice(0,7)===year+'-'+month).sort((a,b)=>a.date.localeCompare(b.date));
+    if(!recs.length){box.innerHTML=`<div class="empty" style="padding:20px"><p>${year}年${+month}月暂无记录</p></div>`;return;}
+    box.innerHTML=drawLine(recs.map(r=>r.date.slice(8)),[
+      {name:'饮水量',color:'#7BA8C4',data:recs.map(r=>r.intake),unit:'ml'},
+      {name:'尿量',color:'#7EC4AB',data:recs.map(r=>r.output),unit:'ml'},
+      {name:'存水量',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:recs.map(r=>r.output!=null?r.intake-r.output:null),unit:'ml'}
+    ],{showVals:true});
+    bindChartTips(box);
+    return;
+  }
   const recs=state.waterRecords.filter(r=>r.date.slice(0,4)===year).sort((a,b)=>a.date.localeCompare(b.date));
   if(!recs.length){box.innerHTML=`<div class="empty" style="padding:20px"><p>${year}年暂无记录</p></div>`;return;}
   const months=[...new Set(recs.map(r=>r.date.slice(5,7)))].sort();
   const intakeAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m);return Math.round(f.reduce((s,r)=>s+r.intake,0)/f.length);});
   const outputAvg=months.map(m=>{const f=recs.filter(r=>r.date.slice(5,7)===m&&r.output!=null&&!isNaN(r.output));return f.length?Math.round(f.reduce((s,r)=>s+r.output,0)/f.length):0;});
   const storeAvg=months.map((m,i)=>intakeAvg[i]-outputAvg[i]);
-  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#7BA8C4',data:intakeAvg,unit:'ml'},{name:'尿量(月日均)',color:'#7EC4AB',data:outputAvg,unit:'ml'},{name:'存水量(月日均)',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:storeAvg,unit:'ml'}]);
+  box.innerHTML=drawLine(months.map(m=>m+'月'),[{name:'饮水量(月日均)',color:'#7BA8C4',data:intakeAvg,unit:'ml'},{name:'尿量(月日均)',color:'#7EC4AB',data:outputAvg,unit:'ml'},{name:'存水量(月日均)',color:'rgba(149,125,196,0.25)',textColor:'#8E7BB8',type:'bar',data:storeAvg,unit:'ml'}],{showVals:true});
   bindChartTips(box);
 }
 
@@ -1637,7 +1664,8 @@ function drawLine(labels,series,opts){
     const unit=s.unit||'';const tipName=esc(s.name);
     if(s.type==='bar'){
       const baseY=yS2(0);
-      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';const tip=tipName+': '+v+unit;if(hgt>0.5)svg+=`<rect x="${cx.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" fill="${col}" rx="4" data-tip="${tip}"/>`;svg+=`<text x="${cx.toFixed(1)}" y="${(v>=0?yv-4:yv+11).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${s.textColor||(v>=0?'#8E7BB8':'#ff4d4f')}">${v}</text>`;});
+      const blStep=xS>0&&xS<40?Math.ceil(40/xS):1;
+      s.data.forEach((v,i)=>{if(v==null)return;const cx=xS2(i);const yv=yS2(v);const top=Math.min(baseY,yv),hgt=Math.abs(baseY-yv);const col=v>=0?s.color:'#ff7875';const tip=tipName+': '+v+unit;if(hgt>0.5)svg+=`<rect x="${cx.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" fill="${col}" rx="4" data-tip="${tip}"/>`;if(i%blStep===0||i===s.data.length-1)svg+=`<text x="${cx.toFixed(1)}" y="${(v>=0?yv-4:yv+11).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${s.textColor||(v>=0?'#8E7BB8':'#ff4d4f')}">${v}</text>`;});
     }else{
       // 缺失值分段
       const segs=[];let cur=[];
@@ -1657,6 +1685,14 @@ function drawLine(labels,series,opts){
       });
       svg+=`<polyline points="${s.data.map((v,i)=>v!=null?xS2(i).toFixed(1)+','+yS2(v).toFixed(1):'').filter(p=>p).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
       s.data.forEach((v,i)=>{if(v!=null){const tip=tipName+': '+v+unit;svg+=`<circle cx="${xS2(i).toFixed(1)}" cy="${yS2(v).toFixed(1)}" r="3.5" fill="#fff" stroke="${s.color}" stroke-width="2.2" data-tip="${tip}"/>`;}});
+      if(opts.showVals){
+        const vlStep=xS>0&&xS<40?Math.ceil(40/xS):1;
+        s.data.forEach((v,i)=>{
+          if(v==null)return;
+          if(i%vlStep!==0&&i!==s.data.length-1)return;
+          svg+=`<text x="${xS2(i).toFixed(1)}" y="${(yS2(v)-7).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="500" fill="${s.textColor||s.color}">${v}</text>`;
+        });
+      }
     }
   });
   let lx=pad.l;series.forEach(s=>{svg+=`<rect x="${lx}" y="7" width="12" height="4" fill="${s.textColor||s.color}" rx="2"/><text x="${lx+16}" y="13" font-size="10" fill="#6B6480">${esc(s.name)}</text>`;lx+=s.name.length*7+30;});
