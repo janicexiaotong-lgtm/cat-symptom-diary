@@ -795,9 +795,29 @@ function renderSymptomPage(){
   if(!window._symptomFilter)window._symptomFilter='呕吐';
   const types=[...new Set(state.symptoms.map(s=>s.type))];
   sel.innerHTML=SYMPTOM_TYPES.filter(t=>types.includes(t.key)).map(t=>`<div class="metric-chip ${window._symptomFilter===t.key?'active':''}" onclick="window._symptomFilter='${t.key}';window._symptomMonth=null;renderSymptomPage()">${t.emoji} ${t.key}</div>`).join('');
-  // 频率图（最近12个月；记录各柱对应月份，点击柱子联动下方列表）
-  const now=new Date();const labels=[],data=[],mks=[];
-  for(let i=11;i>=0;i--){const dd=new Date(now.getFullYear(),now.getMonth()-i,1);const mk=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0');const cnt=state.symptoms.filter(s=>s.type===window._symptomFilter&&s.date&&s.date.slice(0,7)===mk).length;labels.push((dd.getMonth()+1)+'月');data.push(cnt);mks.push(mk);}
+  // 频率图（随时间范围联动：3m/6m/1y=锚点月起最近N个日历月；全部=自最早记录月起；跨年时1月带年份）
+  const allDates=state.symptoms.map(s=>s.date).filter(Boolean).sort();
+  const lastD=allDates.length?new Date(allDates[allDates.length-1]):new Date();
+  const anchorM=new Date(lastD.getFullYear(),lastD.getMonth(),1);
+  const conf2=SYMPTOM_RANGE_CONF[symptomRange];
+  let monthStart;
+  if(conf2.months>0){monthStart=new Date(anchorM.getFullYear(),anchorM.getMonth()-(conf2.months-1),1);}
+  else{
+    const em=allDates.length?new Date(allDates[0]):new Date();
+    monthStart=new Date(em.getFullYear(),em.getMonth(),1);
+    if(monthStart>anchorM)monthStart=new Date(anchorM.getFullYear(),anchorM.getMonth(),1);
+  }
+  const labels=[],data=[],mks=[];
+  const spanMonths=(anchorM.getFullYear()-monthStart.getFullYear())*12+(anchorM.getMonth()-monthStart.getMonth());
+  let mm=new Date(monthStart);let isFirst=true;
+  while(mm<=anchorM){
+    const mk=mm.getFullYear()+'-'+String(mm.getMonth()+1).padStart(2,'0');
+    const cnt=state.symptoms.filter(s=>s.type===window._symptomFilter&&s.date&&s.date.slice(0,7)===mk).length;
+    const showYear=spanMonths>12&&(mm.getMonth()===0||isFirst);
+    labels.push(showYear?(mm.getFullYear()%100)+'年'+(mm.getMonth()+1)+'月':(mm.getMonth()+1)+'月');
+    data.push(cnt);mks.push(mk);isFirst=false;
+    mm.setMonth(mm.getMonth()+1);
+  }
   window._symMks=mks;
   const color=SYMPTOM_TYPES.find(t=>t.key===window._symptomFilter)?.color||'#9254de';
   const selIdx=window._symptomMonth?mks.indexOf(window._symptomMonth):-1;
