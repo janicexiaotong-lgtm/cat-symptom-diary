@@ -243,6 +243,12 @@ input[type=file]{display:none}
       <div class="metric-selector" id="symptomTypeSelector"></div>
       <div class="chart-box" id="freqChart"></div>
       <div class="section-title">历史记录</div>
+      <div class="seg-bar" id="symptomRangeBar">
+        <button class="seg-btn" data-r="3m" onclick="setSymptomRange('3m')">3个月</button>
+        <button class="seg-btn" data-r="6m" onclick="setSymptomRange('6m')">6个月</button>
+        <button class="seg-btn" data-r="1y" onclick="setSymptomRange('1y')">1年</button>
+        <button class="seg-btn active" data-r="all" onclick="setSymptomRange('all')">全部</button>
+      </div>
       <div id="symptomList"></div>
     </div>
   </div>
@@ -769,22 +775,51 @@ function saveSymptom(){
 }
 function deleteSymptom(id){if(!confirm('确定删除？'))return;state.symptoms=state.symptoms.filter(x=>x.id!==id);saveData();toast('已删除');renderSymptomPage();renderDashboard();}
 
+let symptomRange='all'; // 3m / 6m / 1y / all
+const SYMPTOM_RANGE_CONF={ '3m':{months:3,label:'3个月'}, '6m':{months:6,label:'6个月'}, '1y':{months:12,label:'1年'}, 'all':{months:0,label:'全部'} };
+function setSymptomRange(r){
+  symptomRange=r;
+  window._symptomMonth=null;
+  document.querySelectorAll('#symptomRangeBar .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.r===r));
+  renderSymptomPage();
+}
+function symptomBarClick(i){
+  const mk=window._symMks&&window._symMks[i];
+  if(!mk)return;
+  window._symptomMonth=window._symptomMonth===mk?null:mk;
+  renderSymptomPage();
+}
 function renderSymptomPage(){
-  // 类型选择器
+  // 类型选择器（切换类型时清除月份筛选）
   const sel=document.getElementById('symptomTypeSelector');
   if(!window._symptomFilter)window._symptomFilter='呕吐';
   const types=[...new Set(state.symptoms.map(s=>s.type))];
-  sel.innerHTML=SYMPTOM_TYPES.filter(t=>types.includes(t.key)).map(t=>`<div class="metric-chip ${window._symptomFilter===t.key?'active':''}" onclick="window._symptomFilter='${t.key}';renderSymptomPage()">${t.emoji} ${t.key}</div>`).join('');
-  // 频率图
-  const now=new Date();const labels=[],data=[];
-  for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const mk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');const cnt=state.symptoms.filter(s=>s.type===window._symptomFilter&&s.date&&s.date.slice(0,7)===mk).length;labels.push((d.getMonth()+1)+'月');data.push(cnt);}
+  sel.innerHTML=SYMPTOM_TYPES.filter(t=>types.includes(t.key)).map(t=>`<div class="metric-chip ${window._symptomFilter===t.key?'active':''}" onclick="window._symptomFilter='${t.key}';window._symptomMonth=null;renderSymptomPage()">${t.emoji} ${t.key}</div>`).join('');
+  // 频率图（最近12个月；记录各柱对应月份，点击柱子联动下方列表）
+  const now=new Date();const labels=[],data=[],mks=[];
+  for(let i=11;i>=0;i--){const dd=new Date(now.getFullYear(),now.getMonth()-i,1);const mk=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0');const cnt=state.symptoms.filter(s=>s.type===window._symptomFilter&&s.date&&s.date.slice(0,7)===mk).length;labels.push((dd.getMonth()+1)+'月');data.push(cnt);mks.push(mk);}
+  window._symMks=mks;
   const color=SYMPTOM_TYPES.find(t=>t.key===window._symptomFilter)?.color||'#9254de';
-  document.getElementById('freqChart').innerHTML=drawBar(labels,data,color);
-  // 列表
+  const selIdx=window._symptomMonth?mks.indexOf(window._symptomMonth):-1;
+  document.getElementById('freqChart').innerHTML=drawBar(labels,data,color,{click:i=>`symptomBarClick(${i})`,selected:selIdx});
+  // 列表（点击柱子→该月该类型；否则按时间范围过滤）
   const list=document.getElementById('symptomList');
   if(!state.symptoms.length){list.innerHTML='<div class="empty"><div class="emoji">📝</div><p>暂无症状记录</p></div>';return;}
   const sorted=[...state.symptoms].sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
-  list.innerHTML=sorted.map(s=>{
+  const conf=SYMPTOM_RANGE_CONF[symptomRange];
+  let shown=sorted,tip='';
+  if(window._symptomMonth){
+    const mk=window._symptomMonth;
+    shown=sorted.filter(s=>s.date.slice(0,7)===mk&&s.type===window._symptomFilter);
+    tip=`<div style="margin-bottom:10px"><span class="metric-chip active" style="cursor:pointer" onclick="window._symptomMonth=null;renderSymptomPage()">📅 ${mk.slice(0,4)}年${+mk.slice(5)}月 · ${window._symptomFilter} ✕</span></div>`;
+  }else if(conf.months>0){
+    const anchor=new Date(sorted[0].date);
+    const cut=new Date(anchor);cut.setMonth(cut.getMonth()-conf.months);
+    const cutStr=cut.toISOString().slice(0,10);
+    shown=sorted.filter(s=>s.date>=cutStr);
+  }
+  if(!shown.length){list.innerHTML=tip+`<div class="empty" style="padding:24px 10px"><p>${window._symptomMonth?'该月无相关记录':'所选时间范围内暂无症状记录'}</p></div>`;return;}
+  list.innerHTML=tip+shown.map(s=>{
     const cfg=SYMPTOM_TYPES.find(t=>t.key===s.type)||{emoji:'📝'};
     let desc='';
     if(s.type==='呕吐'&&s.vomitContent)desc='内容物：'+s.vomitContent+(s.vomitAmount?' · '+s.vomitAmount:'')+(s.vomitCount?' · '+s.vomitCount+'次':'');
@@ -1106,8 +1141,10 @@ function renderWeightPage(){
   const wc=document.getElementById('weightChart');
   wc.innerHTML=drawLine(chartData.map(w=>w.date.slice(5)),[{name:'体重',color:'#8E7BB8',data:chartData.map(w=>w.value),unit:'kg'}],{yMin:2.4,yMax:3.8,yTicks:weightTicks()});
   bindChartTips(wc);
-  const list=document.getElementById('weightList');const rev=[...sorted].reverse();
-  list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
+  // 历史记录：按所选时间范围过滤（与趋势图联动）
+  const list=document.getElementById('weightList');const rev=[...(inRange.length?inRange:sorted)].reverse();
+  if(!rev.length){list.innerHTML='<div class="empty" style="padding:24px 10px"><p>该时间范围内暂无体重记录</p></div>';}
+  else list.innerHTML=rev.map(w=>`<div class="list-item"><div class="main"><div class="title-row"><span class="title">⚖️ ${w.value} kg</span><span class="tag tag-gray">${w.date}</span></div>${w.note?`<div class="desc">${esc(w.note)}</div>`:''}</div><div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWeight('${w.id}')">删除</button></div></div>`).join('');
 }
 
 /* ===== 饮水 / 尿量 ===== */
@@ -1173,14 +1210,16 @@ function renderWaterPage(){
     msel.style.display='none';msel.innerHTML='';
     window._waterMonth=null;
   }
-  // 顶部统计：随年份/月份选择联动（所选期间的日均）
+  // 顶部统计：随年份/月份选择联动（所选期间的日均；存水保留两位小数）
   const periodRecs=m?yrRecs.filter(r=>r.date.slice(5,7)===m):yrRecs;
   const pLabel=m?`${cur}年${+m}月`:`${cur}年`;
   const pDays=periodRecs.length;
-  const pAvgIn=pDays?Math.round(periodRecs.reduce((s,r)=>s+r.intake,0)/pDays):0;
+  const pInRaw=pDays?periodRecs.reduce((s,r)=>s+r.intake,0)/pDays:0;
   const pOutRecs=periodRecs.filter(r=>r.output!=null&&!isNaN(r.output));
-  const pAvgOut=pOutRecs.length?Math.round(pOutRecs.reduce((s,r)=>s+r.output,0)/pOutRecs.length):null;
-  const pAvgStore=pAvgOut!=null?pAvgIn-pAvgOut:null;
+  const pOutRaw=pOutRecs.length?pOutRecs.reduce((s,r)=>s+r.output,0)/pOutRecs.length:null;
+  const pAvgIn=Math.round(pInRaw);
+  const pAvgOut=pOutRaw!=null?Math.round(pOutRaw):null;
+  const pAvgStore=pOutRaw!=null?(pInRaw-pOutRaw).toFixed(2):null;
   const lastDate=periodRecs.length?periodRecs[periodRecs.length-1].date:sorted[sorted.length-1].date;
   const wKg=getWeightOnDate(lastDate);
   const pPerKg=wKg&&pAvgStore!=null?+(pAvgStore/wKg).toFixed(1):null;
@@ -1190,12 +1229,14 @@ function renderWaterPage(){
     <div class="stat-box"><div class="stat-num" style="color:#8DB89A">${pPerKg!=null?pPerKg:'-'}</div><div class="stat-label">ml 每kg存水</div></div>`;
   sel.innerHTML=years.map(y=>`<span class="metric-chip ${y===cur?'active':''}" onclick="window._waterYear='${y}';window._waterMonth=null;renderWaterPage()">${y}</span>`).join('');
   drawWaterChart(cur,m);
-  const rev=[...sorted].reverse();
+  // 每日记录：按所选年份/月份过滤（与上方标签联动）
+  const rev=[...periodRecs].reverse();
   list.innerHTML=rev.map(r=>{
     const out=r.output!=null&&!isNaN(r.output)?r.output:null;
-    const ret=out!=null?r.intake-out:null;
+    const retNum=out!=null?r.intake-out:null;
+    const ret=retNum!=null?retNum.toFixed(2):null;
     const kg=getWeightOnDate(r.date);
-    const perKg=kg&&ret!=null?+(ret/kg).toFixed(2):null;
+    const perKg=kg&&retNum!=null?+(retNum/kg).toFixed(2):null;
     return `<div class="list-item"><div class="main"><div class="title-row"><span class="title">💧 ${r.date}</span></div>
       <div class="desc">饮水 <b>${r.intake}</b>ml · 尿量 <b>${out!=null?out:'-'}</b>ml · 次数 ${r.count!=null?r.count:'-'}<br>存水量 <b>${ret!=null?ret:'-'}</b>ml${perKg!=null?` · 每kg <b>${perKg}</b>ml`:' · 每kg -'}</div></div>
       <div class="actions"><button class="btn btn-sm btn-danger" onclick="deleteWaterRecord('${r.id}')">删除</button></div></div>`;
@@ -1625,7 +1666,8 @@ function renderCasePage(){
 
 /* ===== 图表 ===== */
 let _gid=0; // SVG 渐变 id 计数器
-function drawBar(labels,data,color){
+function drawBar(labels,data,color,opts){
+  opts=opts||{};
   if(!labels.length)return '<div class="empty" style="padding:20px"><p>暂无数据</p></div>';
   const w=Math.max(320,labels.length*36),h=180;const pad={t:20,r:12,b:32,l:32};const cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
   const max=Math.max(...data,1)*1.2;const slot=cw/data.length,barW=slot*0.62;
@@ -1636,8 +1678,8 @@ function drawBar(labels,data,color){
   let svg=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`;
   for(let i=0;i<=4;i++){const y=pad.t+(ch/4)*i;const v=Math.round(max-(max/4)*i);svg+=`<line x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w-pad.r}" y2="${y.toFixed(1)}" stroke="#EFEAF7"/><text x="${pad.l-4}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#9E96AD">${v}</text>`;}
   svg+=`<line x1="${pad.l}" y1="${baseY}" x2="${w-pad.r}" y2="${baseY}" stroke="#E3DCEF" stroke-width="1.2"/>`;
-  data.forEach((v,i)=>{const x=pad.l+i*slot+(slot-barW)/2;const y=yS(v);const bh=baseY-y;const c=v>=5?'#ff4d4f':v>=3?'#faad14':color;if(v>0){const g=gradFor(c);svg+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(2,bh).toFixed(1)}" fill="url(#${g})" rx="5"/>`;svg+=`<text x="${(x+barW/2).toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${c}">${v}</text>`;}});
-  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)svg+=`<text x="${(pad.l+i*slot+slot/2).toFixed(1)}" y="${h-pad.b+14}" text-anchor="middle" font-size="9.5" fill="#9E96AD">${l}</text>`;});
+  data.forEach((v,i)=>{const x=pad.l+i*slot+(slot-barW)/2;const y=yS(v);const bh=baseY-y;const c=v>=5?'#ff4d4f':v>=3?'#faad14':color;if(v>0){const g=gradFor(c);const sel=opts.selected===i?' stroke="#7B5FC8" stroke-width="2.5"':'';const clk=opts.click?` style="cursor:pointer" onclick="${opts.click(i)}"`:'';svg+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(2,bh).toFixed(1)}" fill="url(#${g})" rx="5"${sel}${clk}/>`;svg+=`<text x="${(x+barW/2).toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${c}">${v}</text>`;}});
+  const step=Math.ceil(labels.length/8);labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1){const isSel=opts.selected===i;const clk=opts.click?` style="cursor:pointer" onclick="${opts.click(i)}"`:'';svg+=`<text x="${(pad.l+i*slot+slot/2).toFixed(1)}" y="${h-pad.b+14}" text-anchor="middle" font-size="${isSel?10:9.5}" font-weight="${isSel?700:400}" fill="${isSel?'#7B5FC8':'#9E96AD'}"${clk}>${l}</text>`;}});
   if(defs)svg+=`<defs>${defs}</defs>`;
   svg+='</svg>';return svg;
 }
