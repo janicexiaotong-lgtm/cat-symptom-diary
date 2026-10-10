@@ -192,6 +192,16 @@ input[type=file]{display:none}
 .seg-btn.active{background:var(--card-solid);color:var(--pri);box-shadow:0 1px 5px rgba(140,120,180,.14)}
 /* 药品库存 */
 .btn-use{background:var(--success);color:#fff}
+/* 指标平均值表 */
+.avg-table{width:100%;border-collapse:collapse;font-size:13px}
+.avg-table th{font-size:11px;color:var(--text-muted);font-weight:500;padding:6px 8px;text-align:center;border-bottom:1px solid var(--glass-border)}
+.avg-table td{padding:9px 8px;text-align:center;border-bottom:1px solid rgba(160,145,195,.08)}
+.avg-table td:first-child{text-align:left}
+.avg-table tr:last-child td{border-bottom:none}
+.avg-name{font-weight:600;font-size:13px}
+.avg-unit{font-size:10px;color:var(--text-muted);font-weight:400}
+.avg-click{color:var(--pri);cursor:pointer;font-weight:700;font-size:14px}
+.avg-date{display:block;font-size:10px;color:var(--text-muted);font-weight:400;margin-top:1px}
 </style>
 </head>
 <body>
@@ -409,6 +419,17 @@ input[type=file]{display:none}
           <button class="seg-btn active" data-r="all" onclick="setLabRange('all')">全部</button>
         </div>
         <div class="chart-box" id="caseLabTrend"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>📊 指标平均值</span><span class="muted" id="avgCount"></span></div>
+        <p class="muted" style="margin-bottom:8px">所选时间范围内 5 项指标的均值 / 最高 / 最低；点击最高或最低可跳转查看该次检查详情</p>
+        <div class="seg-bar" id="avgRangeBar">
+          <button class="seg-btn" data-r="6m" onclick="setAvgRange('6m')">6个月</button>
+          <button class="seg-btn" data-r="1y" onclick="setAvgRange('1y')">1年</button>
+          <button class="seg-btn" data-r="2y" onclick="setAvgRange('2y')">2年</button>
+          <button class="seg-btn active" data-r="all" onclick="setAvgRange('all')">全部</button>
+        </div>
+        <div id="avgTable"></div>
       </div>
       <div class="card">
         <div class="card-title"><span>🔬 指标详情</span><span class="muted" id="labDateLabel"></span></div>
@@ -1449,11 +1470,11 @@ const LAB_REFS={
 function irisStage(crea){if(crea==null)return null;if(crea<140)return 'IRIS 1期';if(crea<=250)return 'IRIS 2期';if(crea<=440)return 'IRIS 3期';return 'IRIS 4期';}
 /* 趋势图可选指标（显示值 fm：HCT 转百分比） */
 const LAB_TREND_METRICS={
-  crea:{name:'肌酐',unit:'μmol/L',color:'#7B5FC8',ref:[71,212],fm:v=>v,scale:[100,500],tick:100},
-  bun:{name:'尿素氮',unit:'mg/dL',color:'#7EC4AB',ref:[16,36],fm:v=>v},
-  phos:{name:'血磷',unit:'mmol/L',color:'#E8845E',ref:[1.00,2.42],fm:v=>v,refLabel:true,fillDot:true},
-  ica:{name:'离子钙',unit:'mmol/L',color:'#4EA5D9',ref:[1.15,1.35],fm:v=>v,refLabel:true,fillDot:true},
-  hct:{name:'HCT',unit:'%',color:'#D4A85C',ref:[30.3,52.3],fm:v=>+(v*100).toFixed(1),refLabel:true,fillDot:true}
+  crea:{name:'肌酐',unit:'μmol/L',color:'#7B5FC8',ref:[71,212],fm:v=>v,scale:[100,500],tick:100,avgDec:0},
+  bun:{name:'尿素氮',unit:'mg/dL',color:'#7EC4AB',ref:[16,36],fm:v=>v,avgDec:0},
+  phos:{name:'血磷',unit:'mmol/L',color:'#E8845E',ref:[1.00,2.42],fm:v=>v,refLabel:true,fillDot:true,avgDec:2},
+  ica:{name:'离子钙',unit:'mmol/L',color:'#4EA5D9',ref:[1.15,1.35],fm:v=>v,refLabel:true,fillDot:true,avgDec:2},
+  hct:{name:'HCT',unit:'%',color:'#D4A85C',ref:[30.3,52.3],fm:v=>+(v*100).toFixed(1),refLabel:true,fillDot:true,avgDec:1}
 };
 /* 病例临床事件（顶部时间线标注用）*/
 const CASE_EVENTS=[
@@ -1624,6 +1645,49 @@ function drawLabCharts(recs){
   svg+='</svg>';ax+='</svg>';
   return `<div class="sm-body"><div class="sm-axis">${ax}</div><div class="sm-scroll">${svg}</div></div>`;
 }
+/* ===== 指标平均值模块 ===== */
+let avgRange='all'; // 6m / 1y / 2y / all（独立于趋势图范围）
+const AVG_RANGE_LABELS={'6m':'近6个月','1y':'近1年','2y':'近2年','all':'全部'};
+function setAvgRange(r){
+  avgRange=r;
+  document.querySelectorAll('#avgRangeBar .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.r===r));
+  renderAvgTable();
+}
+function avgRangeRecords(){
+  if(avgRange==='all')return CASE_LABS.slice();
+  const anchor=CASE_LABS[CASE_LABS.length-1].date;
+  const a=new Date(anchor);const months=avgRange==='6m'?6:avgRange==='1y'?12:24;
+  a.setMonth(a.getMonth()-months);
+  const start=a.toISOString().slice(0,10);
+  return CASE_LABS.filter(r=>r.date>=start);
+}
+function jumpAvgDate(date){
+  selLabDate(date);
+  const el=document.getElementById('labDetail');
+  if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function renderAvgTable(){
+  const box=document.getElementById('avgTable');
+  if(!box)return;
+  const recs=avgRangeRecords();
+  document.getElementById('avgCount').textContent=recs.length?(AVG_RANGE_LABELS[avgRange]+' '+recs.length+' 次检查'):'';
+  const rows=['crea','bun','phos','ica','hct'].map(k=>{
+    const m=LAB_TREND_METRICS[k];
+    const vals=recs.filter(r=>r[k]!=null).map(r=>({v:m.fm(r[k]),date:r.date}));
+    if(!vals.length)return `<tr><td><span class="avg-name">${m.name}</span> <span class="avg-unit">${m.unit}</span></td><td class="muted" colspan="3">－</td></tr>`;
+    const avg=+(vals.reduce((s,x)=>s+x.v,0)/vals.length).toFixed(m.avgDec!=null?m.avgDec:1);
+    const max=vals.reduce((a,b)=>b.v>a.v?b:a);
+    const min=vals.reduce((a,b)=>b.v<a.v?b:a);
+    return `<tr>
+      <td><span class="avg-name">${m.name}</span> <span class="avg-unit">${m.unit}</span></td>
+      <td><b>${avg}</b></td>
+      <td><span class="avg-click" onclick="jumpAvgDate('${max.date}')">${max.v}<span class="avg-date">${max.date.slice(5)}</span></span></td>
+      <td><span class="avg-click" onclick="jumpAvgDate('${min.date}')">${min.v}<span class="avg-date">${min.date.slice(5)}</span></span></td>
+    </tr>`;
+  }).join('');
+  box.innerHTML=`<table class="avg-table"><thead><tr><th style="text-align:left">指标</th><th>平均</th><th>最高 ↘</th><th>最低 ↘</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 function renderLabTrend(){
   const box=document.getElementById('caseLabTrend');
   const recs=labRangeRecords().filter(r=>labMetrics.some(k=>r[k]!=null));
@@ -1678,7 +1742,7 @@ function renderCasePage(){
   const curWeight=ws.length?ws[ws.length-1].value:'-';
   const am=state.medications.filter(m=>!m.endDate||m.endDate>=today());
   document.getElementById('caseSummaryFull').innerHTML=`<div class="cs-cat">🐱 ${esc(catInfo)}</div><ul class="cs-list"><li>主线诊断：<b>慢性肾病 CKD</b>（以 IRIS 3 期为主，最新肌酐 292 μmol/L）</li><li>骨骼：反复桡尺骨骨折手术共 <b>4</b> 次</li><li>麻醉：累计 <b>7</b> 次</li><li>急症：<b>2025-01 输尿管梗阻</b>（肌酐冲至峰值 438）</li><li>泌尿系：反复 <b>FIC</b>（猫特发性膀胱炎）</li><li>泌尿感染：<b>2026-08 肾盂肾炎</b>（菌培大肠杆菌 ESBLs）</li><li>消化：<b>2025-05 出血性肠炎</b></li><li>随访：2023-11-03 ~ 2026-08-23，共 <b>44</b> 次就诊、<b>4</b> 个年份</li><li>长期关注：肌酐趋势、慢性呕吐、肾盂扩张</li></ul><div class="cs-meta">当前体重 ${curWeight}kg · 当前用药 ${am.length} 种 · 数据来源：猫咪病例数据2023-2026.xlsx</div>`;
-  renderLabMetricSelector();renderLabTrend();
+  renderLabMetricSelector();renderLabTrend();renderAvgTable();
   if(!labSelDate)labSelDate=CASE_LABS.length?CASE_LABS[CASE_LABS.length-1].date:null;
   renderLabChips();
   renderLabDetail();
